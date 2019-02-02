@@ -5,6 +5,8 @@ Manage SSL Certificate Signing Requests (CSRs) and SSL certificate chains with a
 
 SSL certificates are hard to work with.  This tool dramatically simplifies the process of managing SSL certificates in a cross-platform solution.
 
+[![Donate](https://cubiclesoft.com/res/donate-shield.png)](https://cubiclesoft.com/donate/)
+
 Features
 --------
 

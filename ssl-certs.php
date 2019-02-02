@@ -119,7 +119,7 @@
 		$csr->loadCSR($info["csr"]);
 
 		$result = array();
-		$result["privatekey"] = isset($info["privatekey"]);
+		$result["privatekey"] = (isset($info["privatekey"]) && $info["privatekey"] !== "");
 		$result["created"] = $info["created"];
 		$result["dn"] = (string)$csr->getDN(FILE_X509_DN_STRING);
 
@@ -146,7 +146,7 @@
 		$cert = $decoder->loadX509($info["cert"]);
 
 		$result = array();
-		$result["privatekey"] = isset($info["privatekey"]);
+		$result["privatekey"] = (isset($info["privatekey"]) && $info["privatekey"] !== "");
 		$result["created"] = $info["created"];
 		$result["type"] = (string)$cert["tbsCertificate"]["version"];
 		$result["serial"] = (string)$cert["tbsCertificate"]["serialNumber"];
@@ -987,14 +987,14 @@
 		{
 			$csrfile = CLI::GetUserInputWithArgs($args, "csrfile", "CSR filename", false, "", $suppressoutput);
 			$valid = file_exists($csrfile);
-			if (!$valid)  CLI::DisplayError("File '" . $csrfile . "' does not exist.");
+			if (!$valid)  CLI::DisplayError("File '" . $csrfile . "' does not exist.", false, false);
 		} while (!$valid);
 
 		do
 		{
 			$privatekeyfile = CLI::GetUserInputWithArgs($args, "privatekey", "Optional:  CSR private key filename", "", "", $suppressoutput);
 			$valid = ($privatekeyfile === "" || file_exists($privatekeyfile));
-			if (!$valid)  CLI::DisplayError("File '" . $privatekeyfile . "' does not exist.");
+			if (!$valid)  CLI::DisplayError("File '" . $privatekeyfile . "' does not exist.", false, false);
 		} while (!$valid);
 
 		$csr = new File_X509();
