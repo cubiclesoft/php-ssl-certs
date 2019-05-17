@@ -1,6 +1,6 @@
 <?php
 	// SSL certificate management tools in pure PHP.
-	// (C) 2016 CubicleSoft.  All Rights Reserved.
+	// (C) 2019 CubicleSoft.  All Rights Reserved.
 
 	if (!isset($_SERVER["argc"]) || !$_SERVER["argc"])
 	{
@@ -25,7 +25,7 @@
 			"suppressoutput" => array("arg" => false),
 			"help" => array("arg" => false)
 		),
-		"userinput" => "="
+		"allow_opts_after_param" => false
 	);
 	$args = CLI::ParseCommandLine($options);
 
@@ -42,7 +42,7 @@
 		echo "\n";
 		echo "Examples:\n";
 		echo "\tphp " . $args["file"] . "\n";
-		echo "\tphp " . $args["file"] . " csr name=test\n";
+		echo "\tphp " . $args["file"] . " csr -name test\n";
 
 		exit();
 	}
@@ -50,6 +50,7 @@
 	// Check enabled extensions.
 	if (!extension_loaded("openssl"))  CLI::DisplayError("The 'openssl' PHP module is not enabled.  Please update the file '" . (php_ini_loaded_file() !== false ? php_ini_loaded_file() : "php.ini") . "' to enable the module.");
 
+	$origargs = $args;
 	$suppressoutput = (isset($args["opts"]["suppressoutput"]) && $args["opts"]["suppressoutput"]);
 
 	// Get the command.
@@ -250,6 +251,27 @@
 		return GetSSLObject("Certificate storage object ID", "No storage objects are available with a certificate" . ($withprivatekey ? " with a private key" : "") . ".", "cert", false, $withprivatekey);
 	}
 
+	function ReinitArgs($newargs)
+	{
+		global $args;
+
+		// Process the parameters.
+		$options = array(
+			"shortmap" => array(
+				"?" => "help"
+			),
+			"rules" => array(
+			)
+		);
+
+		foreach ($newargs as $arg)  $options["rules"][$arg] = array("arg" => true, "multiple" => true);
+		$options["rules"]["help"] = array("arg" => false);
+
+		$args = CLI::ParseCommandLine($options, array_merge(array(""), $args["params"]));
+
+		if (isset($args["opts"]["help"]))  DisplayResult(array("success" => true, "options" => array_keys($options["rules"])));
+	}
+
 	$digests = array(
 		"md2" => "MD2 is very old, very broken - do not use",
 		"md5" => "MD5 is very old, very broken - do not use",
@@ -266,6 +288,8 @@
 	}
 	else if ($cmd === "init")
 	{
+		ReinitArgs(array("id", "ca"));
+
 		// Get the name of the new object.
 		do
 		{
@@ -311,6 +335,8 @@
 	}
 	else if ($cmd === "csr")
 	{
+		ReinitArgs(array("id", "bits", "digest", "domain", "keyusage", "country", "state", "city", "org", "orgunit", "email", "commonname"));
+
 		// Get the object ID for the new CSR.
 		$result = GetSSLObject();
 
@@ -471,6 +497,8 @@
 	}
 	else if ($cmd === "self-sign")
 	{
+		ReinitArgs(array("id", "ca", "days", "digest"));
+
 		// Get a CSR with a private key.
 		$result = GetSSLCSR(true);
 
@@ -548,6 +576,8 @@
 	}
 	else if ($cmd === "sign")
 	{
+		ReinitArgs(array("id", "ca", "days", "digest", "bits", "redo", "domain", "keyusage", "country", "state", "city", "org", "orgunit", "email", "commonname"));
+
 		// Get a CA certificate with private key that is allowed to sign certificates.
 		do
 		{
@@ -761,6 +791,8 @@
 	}
 	else if ($cmd === "get-info")
 	{
+		ReinitArgs(array("id"));
+
 		// Get the object ID.
 		$result = GetSSLObject();
 
@@ -776,6 +808,8 @@
 	}
 	else if ($cmd === "set-signer")
 	{
+		ReinitArgs(array("id"));
+
 		// Get the certificate name.
 		$result = GetSSLCert(false);
 
@@ -812,6 +846,8 @@
 	}
 	else if ($cmd === "verify")
 	{
+		ReinitArgs(array("id"));
+
 		// Get the certificate name.
 		$result = GetSSLCert(false);
 
@@ -869,6 +905,8 @@
 	}
 	else if ($cmd === "export")
 	{
+		ReinitArgs(array("id"));
+
 		// Get the certificate name.
 		$result = GetSSLObject();
 
@@ -976,6 +1014,8 @@
 	}
 	else if ($cmd === "import-csr")
 	{
+		ReinitArgs(array("id", "csrfile", "privatekey"));
+
 		// Get the object ID.
 		$result = GetSSLObject();
 
@@ -1046,6 +1086,8 @@
 	}
 	else if ($cmd === "import-cert")
 	{
+		ReinitArgs(array("id", "certfile", "keysrc", "keyfile", "ca"));
+
 		// Get the object ID.
 		$result = GetSSLObject();
 
@@ -1145,6 +1187,8 @@
 	}
 	else if ($cmd === "rename")
 	{
+		ReinitArgs(array("id", "newid"));
+
 		// Get the object ID.
 		$result = GetSSLObject();
 
@@ -1207,6 +1251,8 @@
 	}
 	else if ($cmd === "delete")
 	{
+		ReinitArgs(array("id"));
+
 		// Get the object ID.
 		$result = GetSSLObject();
 
