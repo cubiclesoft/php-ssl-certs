@@ -56,7 +56,7 @@
 	// Get the command.
 	$cmds = array("list" => "List all SSL storage objects", "init" => "Initialize a SSL storage object", "csr" => "Create a new Certificate Signing Request (CSR)", "self-sign" => "Self-sign a SSL certificate (should only be used for roots and personal certs)", "sign" => "Sign a CSR using a CA enabled certificate with a private key", "get-info" => "Get detailed information about a SSL storage object", "set-signer" => "Sets the signer for a certificate for verify/export purposes", "verify" => "Verifies a certificate chain to the root", "export" => "Exports a certificate and certificate chain for use with other software products", "import-csr" => "Imports an externally generated CSR", "import-cert" => "Imports a signed certificate", "rename" => "Renames a SSL certificate object and updates all child references to it", "delete" => "Deletes a SSL storage object");
 
-	$cmd = CLI::GetLimitedUserInputWithArgs($args, "cmd", "Command", false, "Available commands:", $cmds, true, $suppressoutput);
+	$cmd = CLI::GetLimitedUserInputWithArgs($args, false, "Command", false, "Available commands:", $cmds, true, $suppressoutput);
 
 	// Make sure directories exist.
 	@mkdir($rootpath . "/certs", 0700);
