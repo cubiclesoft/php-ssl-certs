@@ -34,21 +34,23 @@ class Crypt_TripleDES extends Crypt_DES
 	function __construct($mode = CRYPT_MODE_CBC)
 	{
 		switch ($mode) {
-									case CRYPT_DES_MODE_3CBC:
+
+			case CRYPT_DES_MODE_3CBC:
 				parent::Crypt_Base(CRYPT_MODE_CBC);
 				$this->mode_3cbc = true;
 
-								$this->des = array(
+				$this->des = array(
 					new Crypt_DES(CRYPT_MODE_CBC),
 					new Crypt_DES(CRYPT_MODE_CBC),
 					new Crypt_DES(CRYPT_MODE_CBC),
 				);
 
-								$this->des[0]->disablePadding();
+				$this->des[0]->disablePadding();
 				$this->des[1]->disablePadding();
 				$this->des[2]->disablePadding();
 				break;
-						default:
+
+			default:
 				parent::__construct($mode);
 		}
 	}
@@ -101,13 +103,14 @@ class Crypt_TripleDES extends Crypt_DES
 		$length = $this->explicit_key_length ? $this->key_length : strlen($key);
 		if ($length > 8) {
 			$key = str_pad(substr($key, 0, 24), 24, chr(0));
-									$key = $length <= 16 ? substr_replace($key, substr($key, 0, 8), 16) : substr($key, 0, 24);
+
+			$key = $length <= 16 ? substr_replace($key, substr($key, 0, 8), 16) : substr($key, 0, 24);
 		} else {
 			$key = str_pad($key, 8, chr(0));
 		}
 		parent::setKey($key);
 
-										if ($this->mode_3cbc && $length > 8) {
+		if ($this->mode_3cbc && $length > 8) {
 			$this->des[0]->setKey(substr($key,	0, 8));
 			$this->des[1]->setKey(substr($key,	8, 8));
 			$this->des[2]->setKey(substr($key, 16, 8));
@@ -117,7 +120,7 @@ class Crypt_TripleDES extends Crypt_DES
 	function encrypt($plaintext)
 	{
 
-				if ($this->mode_3cbc && strlen($this->key) > 8) {
+		if ($this->mode_3cbc && strlen($this->key) > 8) {
 			return $this->des[2]->encrypt(
 				$this->des[1]->decrypt(
 					$this->des[0]->encrypt(
@@ -170,22 +173,24 @@ class Crypt_TripleDES extends Crypt_DES
 	function _setupKey()
 	{
 		switch (true) {
-									case strlen($this->key) <= 8:
+
+			case strlen($this->key) <= 8:
 				$this->des_rounds = 1;
 				break;
 
-						default:
+			default:
 				$this->des_rounds = 3;
 
-								if ($this->mode_3cbc) {
+				if ($this->mode_3cbc) {
 					$this->des[0]->_setupKey();
 					$this->des[1]->_setupKey();
 					$this->des[2]->_setupKey();
 
-															return;
+					return;
 				}
 		}
-				parent::_setupKey();
+
+		parent::_setupKey();
 	}
 
 	function setPreferredEngine($engine)

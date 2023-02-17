@@ -11,30 +11,41 @@ if (!function_exists('crypt_random_string')) {
 		}
 
 		if (CRYPT_RANDOM_IS_WINDOWS) {
-						if (extension_loaded('mcrypt') && version_compare(PHP_VERSION, '5.3.0', '>=')) {
+
+			if (extension_loaded('mcrypt') && version_compare(PHP_VERSION, '5.3.0', '>=')) {
 				return @mcrypt_create_iv($length);
 			}
-																																										if (extension_loaded('openssl') && version_compare(PHP_VERSION, '5.3.4', '>=')) {
+
+			if (extension_loaded('openssl') && version_compare(PHP_VERSION, '5.3.4', '>=')) {
 				return openssl_random_pseudo_bytes($length);
 			}
 		} else {
-						if (extension_loaded('openssl') && version_compare(PHP_VERSION, '5.3.0', '>=')) {
+
+			if (extension_loaded('openssl') && version_compare(PHP_VERSION, '5.3.0', '>=')) {
 				return openssl_random_pseudo_bytes($length);
 			}
-						static $fp = true;
+
+			static $fp = true;
 			if ($fp === true) {
-												$fp = @fopen('/dev/urandom', 'rb');
+
+				$fp = @fopen('/dev/urandom', 'rb');
 			}
-			if ($fp !== true && $fp !== false) { 				return fread($fp, $length);
+			if ($fp !== true && $fp !== false) {
+				$temp = fread($fp, $length);
+				if (strlen($temp) == $length) {
+					return $temp;
+				}
 			}
-																		if (extension_loaded('mcrypt')) {
+
+			if (extension_loaded('mcrypt')) {
 				return @mcrypt_create_iv($length, MCRYPT_DEV_URANDOM);
 			}
 		}
 
-																																				static $crypto = false, $v;
+		static $crypto = false, $v;
 		if ($crypto === false) {
-						$old_session_id = session_id();
+
+			$old_session_id = session_id();
 			$old_use_cookies = ini_get('session.use_cookies');
 			$old_session_cache_limiter = session_cache_limiter();
 			$_OLD_SESSION = isset($_SESSION) ? $_SESSION : false;
@@ -52,7 +63,8 @@ if (!function_exists('crypt_random_string')) {
 				(isset($_POST) ? phpseclib_safe_serialize($_POST) : '') .
 				(isset($_GET) ? phpseclib_safe_serialize($_GET) : '') .
 				(isset($_COOKIE) ? phpseclib_safe_serialize($_COOKIE) : '') .
-				phpseclib_safe_serialize($GLOBALS) .
+
+				(version_compare(PHP_VERSION, '8.1.0', '>=') ? serialize($GLOBALS) : phpseclib_safe_serialize($GLOBALS)) .
 				phpseclib_safe_serialize($_SESSION) .
 				phpseclib_safe_serialize($_OLD_SESSION)
 			));
@@ -63,7 +75,7 @@ if (!function_exists('crypt_random_string')) {
 
 			session_write_close();
 
-						if ($old_session_id != '') {
+			if ($old_session_id != '') {
 				session_id($old_session_id);
 				session_start();
 				ini_set('session.use_cookies', $old_use_cookies);
@@ -77,10 +89,10 @@ if (!function_exists('crypt_random_string')) {
 				}
 			}
 
-																											$key = pack('H*', sha1($seed . 'A'));
+			$key = pack('H*', sha1($seed . 'A'));
 			$iv = pack('H*', sha1($seed . 'C'));
 
-												switch (true) {
+			switch (true) {
 				case phpseclib_resolve_include_path('Crypt/AES.php'):
 					if (!class_exists('Crypt_AES')) {
 						include_once 'AES.php';
@@ -127,9 +139,12 @@ if (!function_exists('crypt_random_string')) {
 			$crypto->enableContinuousBuffer();
 		}
 
-																		$result = '';
+		$result = '';
 		while (strlen($result) < $length) {
-			$i = $crypto->encrypt(microtime()); 			$r = $crypto->encrypt($i ^ $v); 			$v = $crypto->encrypt($r ^ $i); 			$result.= $r;
+			$i = $crypto->encrypt(microtime());
+			$r = $crypto->encrypt($i ^ $v);
+			$v = $crypto->encrypt($r ^ $i);
+			$result.= $r;
 		}
 		return substr($result, 0, $length);
 	}
@@ -145,13 +160,15 @@ if (!function_exists('phpseclib_safe_serialize')) {
 		if (!is_array($arr)) {
 			return serialize($arr);
 		}
-				if (isset($arr['__phpseclib_marker'])) {
+
+		if (isset($arr['__phpseclib_marker'])) {
 			return '';
 		}
 		$safearr = array();
 		$arr['__phpseclib_marker'] = true;
 		foreach (array_keys($arr) as $key) {
-						if ($key !== '__phpseclib_marker') {
+
+			if ($key !== '__phpseclib_marker') {
 				$safearr[$key] = phpseclib_safe_serialize($arr[$key]);
 			}
 		}
@@ -168,7 +185,7 @@ if (!function_exists('phpseclib_resolve_include_path')) {
 			return stream_resolve_include_path($filename);
 		}
 
-				if (file_exists($filename)) {
+		if (file_exists($filename)) {
 			return realpath($filename);
 		}
 
@@ -176,7 +193,8 @@ if (!function_exists('phpseclib_resolve_include_path')) {
 			preg_split('#(?<!phar):#', get_include_path()) :
 			explode(PATH_SEPARATOR, get_include_path());
 		foreach ($paths as $prefix) {
-						$ds = substr($prefix, -1) == DIRECTORY_SEPARATOR ? '' : DIRECTORY_SEPARATOR;
+
+			$ds = substr($prefix, -1) == DIRECTORY_SEPARATOR ? '' : DIRECTORY_SEPARATOR;
 			$file = $prefix . $ds . $filename;
 			if (file_exists($file)) {
 				return realpath($file);

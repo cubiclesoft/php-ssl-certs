@@ -247,6 +247,18 @@ class Crypt_Twofish extends Crypt_Base
 
 	var $key_length = 16;
 
+	function __construct($mode = CRYPT_MODE_CBC)
+	{
+		parent::__construct($mode);
+
+		$this->m0 = array_map('intval', $this->m0);
+		$this->m1 = array_map('intval', $this->m1);
+		$this->m2 = array_map('intval', $this->m2);
+		$this->m3 = array_map('intval', $this->m3);
+		$this->q0 = array_map('intval', $this->q0);
+		$this->q1 = array_map('intval', $this->q1);
+	}
+
 	function setKeyLength($length)
 	{
 		switch (true) {
@@ -266,7 +278,8 @@ class Crypt_Twofish extends Crypt_Base
 	function _setupKey()
 	{
 		if (isset($this->kl['key']) && $this->key === $this->kl['key']) {
-						return;
+
+			return;
 		}
 		$this->kl = array('key' => $this->key);
 
@@ -333,7 +346,8 @@ class Crypt_Twofish extends Crypt_Base
 					$S3[$i] = $m3[$q1[$q1[$q0[$i] ^ $sb] ^ $s7] ^ $s3];
 				}
 				break;
-			default: 				list($sf, $se, $sd, $sc) = $this->_mdsrem($le_longs[1], $le_longs[2]);
+			default:
+				list($sf, $se, $sd, $sc) = $this->_mdsrem($le_longs[1], $le_longs[2]);
 				list($sb, $sa, $s9, $s8) = $this->_mdsrem($le_longs[3], $le_longs[4]);
 				list($s7, $s6, $s5, $s4) = $this->_mdsrem($le_longs[5], $le_longs[6]);
 				list($s3, $s2, $s1, $s0) = $this->_mdsrem($le_longs[7], $le_longs[8]);
@@ -369,27 +383,29 @@ class Crypt_Twofish extends Crypt_Base
 
 	function _mdsrem($A, $B)
 	{
-				for ($i = 0; $i < 8; ++$i) {
-						$t = 0xff & ($B >> 24);
 
-						$B = ($B << 8) | (0xff & ($A >> 24));
+		for ($i = 0; $i < 8; ++$i) {
+
+			$t = 0xff & ($B >> 24);
+
+			$B = ($B << 8) | (0xff & ($A >> 24));
 			$A<<= 8;
 
 			$u = $t << 1;
 
-						if ($t & 0x80) {
+			if ($t & 0x80) {
 				$u^= 0x14d;
 			}
 
-						$B ^= $t ^ ($u << 16);
+			$B ^= $t ^ ($u << 16);
 
-						$u^= 0x7fffffff & ($t >> 1);
+			$u^= 0x7fffffff & ($t >> 1);
 
-						if ($t & 0x01) {
+			if ($t & 0x01) {
 				$u^= 0xa6 ;
 			}
 
-						$B^= ($u << 24) | ($u << 8);
+			$B^= ($u << 24) | ($u << 8);
 		}
 
 		return array(
@@ -440,11 +456,12 @@ class Crypt_Twofish extends Crypt_Base
 			$R1 = ((($R1 >> 31) & 1) | ($R1 << 1)) ^ $this->safe_intval($t0 + ($t1 << 1) + $K[++$ki]);
 		}
 
-				return pack("V4", $K[4] ^ $R2,
+		return pack("V4", $K[4] ^ $R2,
 							$K[5] ^ $R3,
 							$K[6] ^ $R0,
 							$K[7] ^ $R1);
-			}
+
+	}
 
 	function _decryptBlock($in)
 	{
@@ -487,19 +504,20 @@ class Crypt_Twofish extends Crypt_Base
 			$R0 = ($R0 >> 31 & 0x1 | $R0 << 1) ^ $this->safe_intval($t0 + $t1 + $K[--$ki]);
 		}
 
-				return pack("V4", $K[0] ^ $R2,
+		return pack("V4", $K[0] ^ $R2,
 							$K[1] ^ $R3,
 							$K[2] ^ $R0,
 							$K[3] ^ $R1);
-			}
+
+	}
 
 	function _setupInlineCrypt()
 	{
 		$lambda_functions =& Crypt_Twofish::_getLambdaFunctions();
 
-						$gen_hi_opt_code = (bool)(count($lambda_functions) < 10);
+		$gen_hi_opt_code = (bool)(count($lambda_functions) < 10);
 
-				$code_hash = "Crypt_Twofish, {$this->mode}";
+		$code_hash = "Crypt_Twofish, {$this->mode}";
 		if ($gen_hi_opt_code) {
 			$code_hash = str_pad($code_hash, 32) . $this->_hashInlineCryptFunction($this->key);
 		}
@@ -536,7 +554,7 @@ class Crypt_Twofish extends Crypt_Base
                     ';
 			}
 
-						$encrypt_block = '
+			$encrypt_block = '
                 $in = unpack("V4", $in);
                 $R0 = '.$K[0].' ^ $in[1];
                 $R1 = '.$K[1].' ^ $in[2];
@@ -577,7 +595,7 @@ class Crypt_Twofish extends Crypt_Base
                                  ' . $K[7] . ' ^ $R1);
             ';
 
-						$decrypt_block = '
+			$decrypt_block = '
                 $in = unpack("V4", $in);
                 $R0 = '.$K[4].' ^ $in[1];
                 $R1 = '.$K[5].' ^ $in[2];

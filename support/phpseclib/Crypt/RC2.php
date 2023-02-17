@@ -21,7 +21,7 @@ class Crypt_RC2 extends Crypt_Base
 
 	var $key;
 
-	var $orig_key;
+	var $orig_key = '';
 
 	var $skip_key_adjustment = true;
 
@@ -145,6 +145,10 @@ class Crypt_RC2 extends Crypt_Base
 	{
 		switch ($engine) {
 			case CRYPT_ENGINE_OPENSSL:
+
+				if (defined('OPENSSL_VERSION_TEXT') && version_compare(preg_replace('#OpenSSL (\d+\.\d+\.\d+) .*#', '$1', OPENSSL_VERSION_TEXT), '3.0.1', '>=')) {
+					return false;
+				}
 				if ($this->current_key_length != 128 || strlen($this->orig_key) < 16) {
 					return false;
 				}
@@ -184,14 +188,15 @@ class Crypt_RC2 extends Crypt_Base
 			$t1 = 1024;
 		}
 		$this->current_key_length = $t1;
-				$key = strlen($key) ? substr($key, 0, 128) : "\x00";
+
+		$key = strlen($key) ? substr($key, 0, 128) : "\x00";
 		$t = strlen($key);
 
-				$l = array_values(unpack('C*', $key));
+		$l = array_values(unpack('C*', $key));
 		$t8 = ($t1 + 7) >> 3;
 		$tm = 0xFF >> (8 * $t8 - $t1);
 
-				$pitable = $this->pitable;
+		$pitable = $this->pitable;
 		for ($i = $t; $i < 128; $i++) {
 			$l[$i] = $pitable[$l[$i - 1] + $l[$i - $t]];
 		}
@@ -201,7 +206,7 @@ class Crypt_RC2 extends Crypt_Base
 			$l[$i] = $pitable[$l[$i + 1] ^ $l[$i + $t8]];
 		}
 
-				$l[0] = $this->invpitable[$l[0]];
+		$l[0] = $this->invpitable[$l[0]];
 		array_unshift($l, 'C*');
 
 		parent::setKey(call_user_func_array('pack', $l));
@@ -242,7 +247,8 @@ class Crypt_RC2 extends Crypt_Base
 		$j = 0;
 
 		for (;;) {
-						$r0 = (($r0 + $keys[$j++] + ((($r1 ^ $r2) & $r3) ^ $r1)) & 0xFFFF) << 1;
+
+			$r0 = (($r0 + $keys[$j++] + ((($r1 ^ $r2) & $r3) ^ $r1)) & 0xFFFF) << 1;
 			$r0 |= $r0 >> 16;
 			$r1 = (($r1 + $keys[$j++] + ((($r2 ^ $r3) & $r0) ^ $r2)) & 0xFFFF) << 2;
 			$r1 |= $r1 >> 16;
@@ -256,7 +262,7 @@ class Crypt_RC2 extends Crypt_Base
 					break;
 				}
 
-								$r0 += $keys[$r3 & 0x3F];
+				$r0 += $keys[$r3 & 0x3F];
 				$r1 += $keys[$r0 & 0x3F];
 				$r2 += $keys[$r1 & 0x3F];
 				$r3 += $keys[$r2 & 0x3F];
@@ -276,7 +282,8 @@ class Crypt_RC2 extends Crypt_Base
 		$j = 64;
 
 		for (;;) {
-						$r3 = ($r3 | ($r3 << 16)) >> 5;
+
+			$r3 = ($r3 | ($r3 << 16)) >> 5;
 			$r3 = ($r3 - $keys[--$j] - ((($r0 ^ $r1) & $r2) ^ $r0)) & 0xFFFF;
 			$r2 = ($r2 | ($r2 << 16)) >> 3;
 			$r2 = ($r2 - $keys[--$j] - ((($r3 ^ $r0) & $r1) ^ $r3)) & 0xFFFF;
@@ -290,7 +297,7 @@ class Crypt_RC2 extends Crypt_Base
 					break;
 				}
 
-								$r3 = ($r3 - $keys[$r2 & 0x3F]) & 0xFFFF;
+				$r3 = ($r3 - $keys[$r2 & 0x3F]) & 0xFFFF;
 				$r2 = ($r2 - $keys[$r1 & 0x3F]) & 0xFFFF;
 				$r1 = ($r1 - $keys[$r0 & 0x3F]) & 0xFFFF;
 				$r0 = ($r0 - $keys[$r3 & 0x3F]) & 0xFFFF;
@@ -316,7 +323,7 @@ class Crypt_RC2 extends Crypt_Base
 			$this->setKey('');
 		}
 
-						$l = unpack('Ca/Cb/v*', $this->key);
+		$l = unpack('Ca/Cb/v*', $this->key);
 		array_unshift($l, $this->pitable[$l['a']] | ($l['b'] << 8));
 		unset($l['a']);
 		unset($l['b']);
@@ -327,15 +334,16 @@ class Crypt_RC2 extends Crypt_Base
 	{
 		$lambda_functions = &Crypt_RC2::_getLambdaFunctions();
 
-										$gen_hi_opt_code = (bool)(count($lambda_functions) < 10);
+		$gen_hi_opt_code = (bool)(count($lambda_functions) < 10);
 
-				$code_hash = "Crypt_RC2, {$this->mode}";
+		$code_hash = "Crypt_RC2, {$this->mode}";
 		if ($gen_hi_opt_code) {
 			$code_hash = str_pad($code_hash, 32) . $this->_hashInlineCryptFunction($this->key);
 		}
 
-						if (!isset($lambda_functions[$code_hash])) {
-						$init_crypt = '$keys = $self->keys;';
+		if (!isset($lambda_functions[$code_hash])) {
+
+			$init_crypt = '$keys = $self->keys;';
 
 			switch (true) {
 				case $gen_hi_opt_code:
@@ -347,7 +355,7 @@ class Crypt_RC2 extends Crypt_Base
 					}
 			}
 
-						$encrypt_block = $decrypt_block = '
+			$encrypt_block = $decrypt_block = '
                 $in = unpack("v4", $in);
                 $r0 = $in[1];
                 $r1 = $in[2];
@@ -355,12 +363,13 @@ class Crypt_RC2 extends Crypt_Base
                 $r3 = $in[4];
             ';
 
-						$limit = 20;
+			$limit = 20;
 			$actions = array($limit => 44, 44 => 64);
 			$j = 0;
 
 			for (;;) {
-								$encrypt_block .= '
+
+				$encrypt_block .= '
                     $r0 = (($r0 + ' . $keys[$j++] . ' +
                            ((($r1 ^ $r2) & $r3) ^ $r1)) & 0xFFFF) << 1;
                     $r0 |= $r0 >> 16;
@@ -379,7 +388,7 @@ class Crypt_RC2 extends Crypt_Base
 						break;
 					}
 
-										$encrypt_block .= '
+					$encrypt_block .= '
                         $r0 += $keys[$r3 & 0x3F];
                         $r1 += $keys[$r0 & 0x3F];
                         $r2 += $keys[$r1 & 0x3F];
@@ -390,12 +399,13 @@ class Crypt_RC2 extends Crypt_Base
 
 			$encrypt_block .= '$in = pack("v4", $r0, $r1, $r2, $r3);';
 
-						$limit = 44;
+			$limit = 44;
 			$actions = array($limit => 20, 20 => 0);
 			$j = 64;
 
 			for (;;) {
-								$decrypt_block .= '
+
+				$decrypt_block .= '
                     $r3 = ($r3 | ($r3 << 16)) >> 5;
                     $r3 = ($r3 - ' . $keys[--$j] . ' -
                            ((($r0 ^ $r1) & $r2) ^ $r0)) & 0xFFFF;
@@ -414,7 +424,7 @@ class Crypt_RC2 extends Crypt_Base
 						break;
 					}
 
-										$decrypt_block .= '
+					$decrypt_block .= '
                         $r3 = ($r3 - $keys[$r2 & 0x3F]) & 0xFFFF;
                         $r2 = ($r2 - $keys[$r1 & 0x3F]) & 0xFFFF;
                         $r1 = ($r1 - $keys[$r0 & 0x3F]) & 0xFFFF;
@@ -425,7 +435,7 @@ class Crypt_RC2 extends Crypt_Base
 
 			$decrypt_block .= '$in = pack("v4", $r0, $r1, $r2, $r3);';
 
-						$lambda_functions[$code_hash] = $this->_createInlineCryptFunction(
+			$lambda_functions[$code_hash] = $this->_createInlineCryptFunction(
 				array(
 					'init_crypt'	=> $init_crypt,
 					'encrypt_block' => $encrypt_block,
@@ -434,6 +444,6 @@ class Crypt_RC2 extends Crypt_Base
 			);
 		}
 
-				$this->inline_crypt = $lambda_functions[$code_hash];
+		$this->inline_crypt = $lambda_functions[$code_hash];
 	}
 }}

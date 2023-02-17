@@ -26,7 +26,9 @@ define('FILE_X509_FORMAT_SPKAC', 2);
 
 define('FILE_X509_FORMAT_AUTO_DETECT', 3);
 
-define('FILE_X509_ATTR_ALL', -1); define('FILE_X509_ATTR_APPEND', -2); define('FILE_X509_ATTR_REPLACE', -3);
+define('FILE_X509_ATTR_ALL', -1);
+define('FILE_X509_ATTR_APPEND', -2);
+define('FILE_X509_ATTR_REPLACE', -3);
 
 class File_X509
 {
@@ -45,6 +47,7 @@ class File_X509
 	var $AuthorityKeyIdentifier;
 	var $CertificatePolicies;
 	var $AuthorityInfoAccessSyntax;
+	var $SubjectInfoAccessSyntax;
 	var $SubjectAltName;
 	var $SubjectDirectoryAttributes;
 	var $PrivateKeyUsagePeriod;
@@ -149,9 +152,10 @@ class File_X509
 			'children' => $AttributeTypeAndValue
 		);
 
-				$RDNSequence = array(
+		$RDNSequence = array(
 			'type'	 => FILE_ASN1_TYPE_SEQUENCE,
-						'min'		=> 0,
+
+			'min'		=> 0,
 			'max'		=> -1,
 			'children' => $this->RelativeDistinguishedName
 		);
@@ -163,7 +167,7 @@ class File_X509
 			)
 		);
 
-				$AlgorithmIdentifier = array(
+		$AlgorithmIdentifier = array(
 			'type'	 => FILE_ASN1_TYPE_SEQUENCE,
 			'children' => array(
 				'algorithm'	=> array('type' => FILE_ASN1_TYPE_OBJECT_IDENTIFIER),
@@ -190,8 +194,10 @@ class File_X509
 		$this->Extensions = array(
 			'type'	 => FILE_ASN1_TYPE_SEQUENCE,
 			'min'		=> 1,
-						'max'		=> -1,
-						'children' => $Extension
+
+			'max'		=> -1,
+
+			'children' => $Extension
 		);
 
 		$SubjectPublicKeyInfo = array(
@@ -212,7 +218,7 @@ class File_X509
 			)
 		);
 
-				$Validity = array(
+		$Validity = array(
 			'type'	 => FILE_ASN1_TYPE_SEQUENCE,
 			'children' => array(
 				'notBefore' => $Time,
@@ -227,10 +233,11 @@ class File_X509
 			'mapping' => array('v1', 'v2', 'v3')
 		);
 
-				$TBSCertificate = array(
+		$TBSCertificate = array(
 			'type'	 => FILE_ASN1_TYPE_SEQUENCE,
 			'children' => array(
-												'version'			 => array(
+
+				'version'			 => array(
 											 'constant' => 0,
 											 'optional' => true,
 											 'explicit' => true,
@@ -242,7 +249,8 @@ class File_X509
 				'validity'			 => $Validity,
 				'subject'				=> $this->Name,
 				'subjectPublicKeyInfo' => $SubjectPublicKeyInfo,
-								'issuerUniqueID'		=> array(
+
+				'issuerUniqueID'		=> array(
 												'constant' => 1,
 												'optional' => true,
 												'implicit' => true
@@ -252,7 +260,8 @@ class File_X509
 												'optional' => true,
 												'implicit' => true
 											) + $UniqueIdentifier,
-												'extensions'			=> array(
+
+				'extensions'			=> array(
 												'constant' => 3,
 												'optional' => true,
 												'explicit' => true
@@ -304,7 +313,8 @@ class File_X509
 		$OrganizationalUnitNames = array(
 			'type'	 => FILE_ASN1_TYPE_SEQUENCE,
 			'min'		=> 1,
-			'max'		=> 4, 			'children' => array('type' => FILE_ASN1_TYPE_PRINTABLE_STRING)
+			'max'		=> 4,
+			'children' => array('type' => FILE_ASN1_TYPE_PRINTABLE_STRING)
 		);
 
 		$PersonalName = array(
@@ -355,7 +365,8 @@ class File_X509
 
 		$AdministrationDomainName = array(
 			'type'	 => FILE_ASN1_TYPE_CHOICE,
-									'class'	=> FILE_ASN1_CLASS_APPLICATION,
+
+			'class'	=> FILE_ASN1_CLASS_APPLICATION,
 			'cast'	 => 2,
 			'children' => array(
 				'numeric'	=> array('type' => FILE_ASN1_TYPE_NUMERIC_STRING),
@@ -365,7 +376,8 @@ class File_X509
 
 		$CountryName = array(
 			'type'	 => FILE_ASN1_TYPE_CHOICE,
-									'class'	=> FILE_ASN1_CLASS_APPLICATION,
+
+			'class'	=> FILE_ASN1_CLASS_APPLICATION,
 			'cast'	 => 1,
 			'children' => array(
 				'x121-dcc-code'		=> array('type' => FILE_ASN1_TYPE_NUMERIC_STRING),
@@ -407,7 +419,8 @@ class File_X509
 		$ExtensionAttributes = array(
 			'type'	 => FILE_ASN1_TYPE_SET,
 			'min'		=> 1,
-			'max'		=> 256, 			'children' => $ExtensionAttribute
+			'max'		=> 256,
+			'children' => $ExtensionAttribute
 		);
 
 		$BuiltInDomainDefinedAttribute = array(
@@ -421,7 +434,8 @@ class File_X509
 		$BuiltInDomainDefinedAttributes = array(
 			'type'	 => FILE_ASN1_TYPE_SEQUENCE,
 			'min'		=> 1,
-			'max'		=> 4, 			'children' => $BuiltInDomainDefinedAttribute
+			'max'		=> 4,
+			'children' => $BuiltInDomainDefinedAttribute
 		);
 
 		$BuiltInStandardAttributes =	array(
@@ -484,7 +498,8 @@ class File_X509
 									'optional' => true,
 									'implicit' => true
 								) + $this->DirectoryString,
-				 				 				 'partyName'	=> array(
+
+				 'partyName'	=> array(
 									'constant' => 1,
 									'optional' => true,
 									'implicit' => true
@@ -707,6 +722,13 @@ class File_X509
 			'children' => $AccessDescription
 		);
 
+		$this->SubjectInfoAccessSyntax = array(
+			'type'	 => FILE_ASN1_TYPE_SEQUENCE,
+			'min'		=> 1,
+			'max'		=> -1,
+			'children' => $AccessDescription
+		);
+
 		$this->SubjectAltName = $GeneralNames;
 
 		$this->PrivateKeyUsagePeriod = array(
@@ -807,7 +829,7 @@ class File_X509
 			)
 		);
 
-				$this->netscape_cert_type = array(
+		$this->netscape_cert_type = array(
 			'type'	=> FILE_ASN1_TYPE_BIT_STRING,
 			'mapping' => array(
 				'SSLClient',
@@ -936,7 +958,8 @@ class File_X509
 							'superseded',
 							'cessationOfOperation',
 							'certificateHold',
-														8 => 'removeFromCRL',
+
+							8 => 'removeFromCRL',
 							'privilegeWithdrawn',
 							'aACompromise'
 			)
@@ -1016,7 +1039,7 @@ class File_X509
 			'children' => $this->DirectoryString
 		);
 
-				$this->oids = array(
+		$this->oids = array(
 			'1.3.6.1.5.5.7' => 'id-pkix',
 			'1.3.6.1.5.5.7.1' => 'id-pe',
 			'1.3.6.1.5.5.7.2' => 'id-qt',
@@ -1164,15 +1187,21 @@ class File_X509
 			'1.2.643.2.2.3' => 'id-GostR3411-94-with-GostR3410-2001',
 			'1.2.643.2.2.20' => 'id-GostR3410-2001',
 			'1.2.643.2.2.19' => 'id-GostR3410-94',
-						'2.16.840.1.113730' => 'netscape',
+
+			'2.16.840.1.113730' => 'netscape',
 			'2.16.840.1.113730.1' => 'netscape-cert-extension',
 			'2.16.840.1.113730.1.1' => 'netscape-cert-type',
 			'2.16.840.1.113730.1.13' => 'netscape-comment',
 			'2.16.840.1.113730.1.8' => 'netscape-ca-policy-url',
-						'1.3.6.1.5.5.7.1.12' => 'id-pe-logotype',
+
+			'1.3.6.1.5.5.7.1.12' => 'id-pe-logotype',
 			'1.2.840.113533.7.65.0' => 'entrustVersInfo',
 			'2.16.840.1.113733.1.6.9' => 'verisignPrivate',
-									'1.2.840.113549.1.9.2' => 'pkcs-9-at-unstructuredName', 			'1.2.840.113549.1.9.7' => 'pkcs-9-at-challengePassword', 			'1.2.840.113549.1.9.14' => 'pkcs-9-at-extensionRequest' 		);
+
+			'1.2.840.113549.1.9.2' => 'pkcs-9-at-unstructuredName',
+			'1.2.840.113549.1.9.7' => 'pkcs-9-at-challengePassword',
+			'1.2.840.113549.1.9.14' => 'pkcs-9-at-extensionRequest'
+		);
 	}
 
 	function File_X509()
@@ -1252,7 +1281,8 @@ class File_X509
 		}
 
 		switch (true) {
-						case !($algorithm = $this->_subArray($cert, 'tbsCertificate/subjectPublicKeyInfo/algorithm/algorithm')):
+
+			case !($algorithm = $this->_subArray($cert, 'tbsCertificate/subjectPublicKeyInfo/algorithm/algorithm')):
 			case is_object($cert['tbsCertificate']['subjectPublicKeyInfo']['subjectPublicKey']):
 				break;
 			default:
@@ -1262,7 +1292,8 @@ class File_X509
 							= base64_encode("\0" . base64_decode(preg_replace('#-.+-|[\r\n]#', '', $cert['tbsCertificate']['subjectPublicKeyInfo']['subjectPublicKey'])));
 
 						$cert['tbsCertificate']['subjectPublicKeyInfo']['algorithm']['parameters'] = null;
-												$cert['signatureAlgorithm']['parameters'] = null;
+
+						$cert['signatureAlgorithm']['parameters'] = null;
 						$cert['tbsCertificate']['signature']['parameters'] = null;
 				}
 		}
@@ -1279,7 +1310,8 @@ class File_X509
 		$filters['tbsCertificate']['subjectPublicKeyInfo']['algorithm']['parameters'] = $type_utf8_string;
 		$filters['signatureAlgorithm']['parameters'] = $type_utf8_string;
 		$filters['authorityCertIssuer']['directoryName']['rdnSequence']['value'] = $type_utf8_string;
-				$filters['distributionPoint']['fullName']['directoryName']['rdnSequence']['value'] = $type_utf8_string;
+
+		$filters['distributionPoint']['fullName']['directoryName']['rdnSequence']['value'] = $type_utf8_string;
 		$filters['directoryName']['rdnSequence']['value'] = $type_utf8_string;
 
 		$filters['policyQualifiers']['qualifier']
@@ -1296,7 +1328,8 @@ class File_X509
 		switch ($format) {
 			case FILE_X509_FORMAT_DER:
 				return $cert;
-						default:
+
+			default:
 				return "-----BEGIN CERTIFICATE-----\r\n" . chunk_split(base64_encode($cert), 64) . '-----END CERTIFICATE-----';
 		}
 	}
@@ -1310,11 +1343,14 @@ class File_X509
 				$id = $extensions[$i]['extnId'];
 				$value = &$extensions[$i]['extnValue'];
 				$value = base64_decode($value);
-				$decoded = $asn1->decodeBER($value);
 
 				$map = $this->_getMapping($id);
 				if (!is_bool($map)) {
-					$mapped = $asn1->asn1map($decoded[0], $map, array('iPAddress' => array($this, '_decodeIP')));
+					$decoder = $id == 'id-ce-nameConstraints' ?
+						array($this, '_decodeNameConstraintIP') :
+						array($this, '_decodeIP');
+					$decoded = $asn1->decodeBER($value);
+					$mapped = $asn1->asn1map($decoded[0], $map, array('iPAddress' => $decoder));
 					$value = $mapped === false ? $decoded[0] : $mapped;
 
 					if ($id == 'id-ce-certificatePolicies') {
@@ -1366,12 +1402,14 @@ class File_X509
 								$map = $this->_getMapping($subid);
 								$subvalue = &$value[$j]['policyQualifiers'][$k]['qualifier'];
 								if ($map !== false) {
-																											$subvalue = new File_ASN1_Element($asn1->encodeDER($subvalue, $map));
+
+									$subvalue = new File_ASN1_Element($asn1->encodeDER($subvalue, $map));
 								}
 							}
 						}
 						break;
-					case 'id-ce-authorityKeyIdentifier': 						if (isset($value['authorityCertSerialNumber'])) {
+					case 'id-ce-authorityKeyIdentifier':
+						if (isset($value['authorityCertSerialNumber'])) {
 							if ($value['authorityCertSerialNumber']->toBytes() == '') {
 								$temp = chr((FILE_ASN1_CLASS_CONTEXT_SPECIFIC << 6) | 2) . "\1\0";
 								$value['authorityCertSerialNumber'] = new File_ASN1_Element($temp);
@@ -1503,7 +1541,8 @@ class File_X509
 
 	function _getMapping($extnId)
 	{
-		if (!is_string($extnId)) { 			return true;
+		if (!is_string($extnId)) {
+			return true;
 		}
 
 		switch ($extnId) {
@@ -1523,6 +1562,8 @@ class File_X509
 				return $this->ExtKeyUsageSyntax;
 			case 'id-pe-authorityInfoAccess':
 				return $this->AuthorityInfoAccessSyntax;
+			case 'id-pe-subjectInfoAccess':
+				return $this->SubjectInfoAccessSyntax;
 			case 'id-ce-subjectAltName':
 				return $this->SubjectAltName;
 			case 'id-ce-subjectDirectoryAttributes':
@@ -1543,22 +1584,30 @@ class File_X509
 			case 'netscape-ca-policy-url':
 				return $this->netscape_ca_policy_url;
 
-															case 'id-qt-unotice':
+			case 'id-qt-unotice':
 				return $this->UserNotice;
 
-						case 'id-pe-logotype': 			case 'entrustVersInfo':
-						case '1.3.6.1.4.1.311.20.2': 			case '1.3.6.1.4.1.311.21.1': 									case '2.23.42.7.0': 									case '1.3.6.1.4.1.11129.2.4.2':
-									case '1.3.6.1.5.5.7.1.3':
+			case 'id-pe-logotype':
+			case 'entrustVersInfo':
+
+			case '1.3.6.1.4.1.311.20.2':
+			case '1.3.6.1.4.1.311.21.1':
+
+			case '2.23.42.7.0':
+
+			case '1.3.6.1.4.1.11129.2.4.2':
+
+			case '1.3.6.1.5.5.7.1.3':
 				return true;
 
-						case 'pkcs-9-at-unstructuredName':
+			case 'pkcs-9-at-unstructuredName':
 				return $this->PKCS9String;
 			case 'pkcs-9-at-challengePassword':
 				return $this->DirectoryString;
 			case 'pkcs-9-at-extensionRequest':
 				return $this->Extensions;
 
-						case 'id-ce-cRLNumber':
+			case 'id-ce-cRLNumber':
 				return $this->CRLNumber;
 			case 'id-ce-deltaCRLIndicator':
 				return $this->CRLNumber;
@@ -1703,7 +1752,11 @@ class File_X509
 				if (!$fsock) {
 					return false;
 				}
-				fputs($fsock, "GET $parts[path] HTTP/1.0\r\n");
+				$path = $parts['path'];
+				if (isset($parts['query'])) {
+					$path.= '?' . $parts['query'];
+				}
+				fputs($fsock, "GET $path HTTP/1.0\r\n");
 				fputs($fsock, "Host: $parts[host]\r\n\r\n");
 				$line = fgets($fsock, 1024);
 				if (strlen($line) < 3) {
@@ -1714,15 +1767,20 @@ class File_X509
 					return false;
 				}
 
-								while (!feof($fsock) && fgets($fsock, 1024) != "\r\n") {
+				while (!feof($fsock) && fgets($fsock, 1024) != "\r\n") {
 				}
 
 				while (!feof($fsock)) {
-					$data.= fread($fsock, 1024);
+					$temp = fread($fsock, 1024);
+					if ($temp === false) {
+						return false;
+					}
+					$data.= $temp;
 				}
 
 				break;
-											}
+
+		}
 
 		return $data;
 	}
@@ -1735,7 +1793,8 @@ class File_X509
 		}
 		foreach ($opts as $opt) {
 			if ($opt['accessMethod'] == 'id-ad-caIssuers') {
-																if (isset($opt['accessLocation']['uniformResourceIdentifier'])) {
+
+				if (isset($opt['accessLocation']['uniformResourceIdentifier'])) {
 					$url = $opt['accessLocation']['uniformResourceIdentifier'];
 					break;
 				}
@@ -1751,7 +1810,7 @@ class File_X509
 			return false;
 		}
 
-		$parent = new static();
+		$parent = new File_X509();
 		$parent->CAs = $this->CAs;
 
 		if (!is_array($parent->loadX509($cert))) {
@@ -1784,7 +1843,8 @@ class File_X509
 
 		switch (true) {
 			case isset($this->currentCert['tbsCertificate']):
-								switch (true) {
+
+				switch (true) {
 					case !defined('FILE_X509_IGNORE_TYPE') && $this->currentCert['tbsCertificate']['issuer'] === $this->currentCert['tbsCertificate']['subject']:
 					case defined('FILE_X509_IGNORE_TYPE') && $this->getIssuerDN(FILE_X509_DN_STRING) === $this->getDN(FILE_X509_DN_STRING):
 						$authorityKey = $this->getExtension('id-ce-authorityKeyIdentifier');
@@ -1793,12 +1853,14 @@ class File_X509
 							case !is_array($authorityKey):
 							case !$subjectKeyID:
 							case isset($authorityKey['keyIdentifier']) && $authorityKey['keyIdentifier'] === $subjectKeyID:
-								$signingCert = $this->currentCert; 						}
+								$signingCert = $this->currentCert;
+						}
 				}
 
 				if (!empty($this->CAs)) {
 					for ($i = 0; $i < count($this->CAs); $i++) {
-																		$ca = $this->CAs[$i];
+
+						$ca = $this->CAs[$i];
 						switch (true) {
 							case !defined('FILE_X509_IGNORE_TYPE') && $this->currentCert['tbsCertificate']['issuer'] === $ca['tbsCertificate']['subject']:
 							case defined('FILE_X509_IGNORE_TYPE') && $this->getDN(FILE_X509_DN_STRING, $this->currentCert['tbsCertificate']['issuer']) === $this->getDN(FILE_X509_DN_STRING, $ca['tbsCertificate']['subject']):
@@ -1809,8 +1871,10 @@ class File_X509
 									case !$subjectKeyID:
 									case isset($authorityKey['keyIdentifier']) && $authorityKey['keyIdentifier'] === $subjectKeyID:
 										if (is_array($authorityKey) && isset($authorityKey['authorityCertSerialNumber']) && !$authorityKey['authorityCertSerialNumber']->equals($ca['tbsCertificate']['serialNumber'])) {
-											break 2; 										}
-										$signingCert = $ca; 										break 3;
+											break 2;
+										}
+										$signingCert = $ca;
+										break 3;
 								}
 						}
 					}
@@ -1857,8 +1921,10 @@ class File_X509
 									case !$subjectKeyID:
 									case isset($authorityKey['keyIdentifier']) && $authorityKey['keyIdentifier'] === $subjectKeyID:
 										if (is_array($authorityKey) && isset($authorityKey['authorityCertSerialNumber']) && !$authorityKey['authorityCertSerialNumber']->equals($ca['tbsCertificate']['serialNumber'])) {
-											break 2; 										}
-										$signingCert = $ca; 										break 3;
+											break 2;
+										}
+										$signingCert = $ca;
+										break 3;
 								}
 						}
 					}
@@ -1934,7 +2000,8 @@ class File_X509
 			case 'rsaEncryption':
 				return
 					"-----BEGIN RSA PUBLIC KEY-----\r\n" .
-																				chunk_split(base64_encode(substr(base64_decode($key), 1)), 64) .
+
+					chunk_split(base64_encode(substr(base64_decode($key), 1)), 64) .
 					'-----END RSA PUBLIC KEY-----';
 			default:
 				return $key;
@@ -1948,9 +2015,18 @@ class File_X509
 		return long2ip($ip);
 	}
 
+	function _decodeNameConstraintIP($ip)
+	{
+		$ip = base64_decode($ip);
+		list(, $ip, $mask) = unpack('N2', $ip);
+		return array(long2ip($ip), long2ip($mask));
+	}
+
 	function _encodeIP($ip)
 	{
-		return base64_encode(pack('N', ip2long($ip)));
+		return is_string($ip) ?
+			base64_encode(pack('N', ip2long($ip))) :
+			base64_encode(pack('NN', ip2long($ip[0]), ip2long($ip[1])));
 	}
 
 	function _translateDNProp($propName)
@@ -2082,7 +2158,8 @@ class File_X509
 		}
 
 		$dn = array_values($dn);
-				if (!isset($dn[0])) {
+
+		if (!isset($dn[0])) {
 			$dn = array_splice($dn, 0, 0);
 		}
 	}
@@ -2125,7 +2202,8 @@ class File_X509
 							}
 						}
 						if (is_array($v)) {
-							$v = array_pop($v); 						}
+							$v = array_pop($v);
+						}
 					} elseif (is_object($v) && strtolower(get_class($v)) == 'file_asn1_element') {
 						$map = $this->_getMapping($propName);
 						if (!is_bool($map)) {
@@ -2149,10 +2227,11 @@ class File_X509
 
 		if (is_array($dn)) {
 			if (isset($dn['rdnSequence'])) {
-				$this->dn = $dn; 				return true;
+				$this->dn = $dn;
+				return true;
 			}
 
-						foreach ($dn as $prop => $value) {
+			foreach ($dn as $prop => $value) {
 				if (!$this->setDNProp($prop, $value, $type)) {
 					return false;
 				}
@@ -2160,7 +2239,7 @@ class File_X509
 			return true;
 		}
 
-				$results = preg_split('#((?:^|, *|/)(?:C=|O=|OU=|CN=|L=|ST=|SN=|postalCode=|streetAddress=|emailAddress=|serialNumber=|organizationalUnitName=|title=|description=|role=|x500UniqueIdentifier=|postalAddress=))#', $dn, -1, PREG_SPLIT_DELIM_CAPTURE);
+		$results = preg_split('#((?:^|, *|/)(?:C=|O=|OU=|CN=|L=|ST=|SN=|postalCode=|streetAddress=|emailAddress=|serialNumber=|organizationalUnitName=|title=|description=|role=|x500UniqueIdentifier=|postalAddress=))#', $dn, -1, PREG_SPLIT_DELIM_CAPTURE);
 		for ($i = 1; $i < count($results); $i+=2) {
 			$prop = trim($results[$i], ', =/');
 			$value = $results[$i + 1];
@@ -2190,7 +2269,8 @@ class File_X509
 				$this->_mapOutDNs($dn, 'rdnSequence', $asn1);
 				return $asn1->encodeDER($dn, $this->Name);
 			case FILE_X509_DN_CANON:
-																$asn1 = new File_ASN1();
+
+				$asn1 = new File_ASN1();
 				$asn1->loadOIDs($this->oids);
 				$filters = array();
 				$filters['value'] = array('type' => FILE_ASN1_TYPE_UTF8_STRING);
@@ -2228,7 +2308,7 @@ class File_X509
 				return strtolower(bin2hex(pack('N', $hash)));
 		}
 
-				$start = true;
+		$start = true;
 		$output = '';
 		$result = array();
 		$asn1 = new File_ASN1();
@@ -2292,16 +2372,19 @@ class File_X509
 					}
 				}
 				if (is_array($value)) {
-					$value = array_pop($value); 				}
+					$value = array_pop($value);
+				}
 			} elseif (is_object($value) && strtolower(get_class($value)) == 'file_asn1_element') {
-								$callback = version_compare(PHP_VERSION, '5.3.0') >= 0 ?
-					function ($x) { return "\x" . bin2hex($x[0]); } :
+
+				$callback = version_compare(PHP_VERSION, '5.3.0') >= 0 ?
+					eval('return function ($x) { return "\x" . bin2hex($x[0]); };') :
 					create_function('$x', 'return "\x" . bin2hex($x[0]);');
-								$value = strtoupper(preg_replace_callback('#[^\x20-\x7E]#', $callback, $value->element));
+
+				$value = strtoupper(preg_replace_callback('#[^\x20-\x7E]#', $callback, $value->element));
 			}
 			$output.= $desc . '=' . $value;
 			$result[$desc] = isset($result[$desc]) ?
-				array_merge((array) $dn[$prop], array($value)) :
+				array_merge((array) $result[$desc], array($value)) :
 				$value;
 			$start = false;
 		}
@@ -2573,7 +2656,8 @@ class File_X509
 		switch ($format) {
 			case FILE_X509_FORMAT_DER:
 				return $csr;
-						default:
+
+			default:
 				return "-----BEGIN CERTIFICATE REQUEST-----\r\n" . chunk_split(base64_encode($csr), 64) . '-----END CERTIFICATE REQUEST-----';
 		}
 	}
@@ -2590,7 +2674,7 @@ class File_X509
 
 		$asn1 = new File_ASN1();
 
-				$temp = preg_replace('#(?:SPKAC=)|[ \r\n\\\]#', '', $spkac);
+		$temp = preg_replace('#(?:SPKAC=)|[ \r\n\\\]#', '', $spkac);
 		$temp = preg_match('#^[a-zA-Z\d/+]*={0,2}$#', $temp) ? base64_decode($temp) : false;
 		if ($temp != false) {
 			$spkac = $temp;
@@ -2669,8 +2753,10 @@ class File_X509
 		switch ($format) {
 			case FILE_X509_FORMAT_DER:
 				return $spkac;
-						default:
-												return 'SPKAC=' . base64_encode($spkac);
+
+			default:
+
+				return 'SPKAC=' . base64_encode($spkac);
 		}
 	}
 
@@ -2780,7 +2866,8 @@ class File_X509
 		switch ($format) {
 			case FILE_X509_FORMAT_DER:
 				return $crl;
-						default:
+
+			default:
 				return "-----BEGIN X509 CRL-----\r\n" . chunk_split(base64_encode($crl), 64) . '-----END X509 CRL-----';
 		}
 	}
@@ -2791,7 +2878,8 @@ class File_X509
 			return $date;
 		}
 		if (!class_exists('DateTime')) {
-			$year = @gmdate("Y", @strtotime($date)); 		} else {
+			$year = @gmdate("Y", @strtotime($date));
+		} else {
 			$dateObj = new DateTime($date, new DateTimeZone('GMT'));
 			$year = $dateObj->format('Y');
 		}
@@ -2870,16 +2958,21 @@ class File_X509
 				'tbsCertificate' =>
 					array(
 						'version' => 'v3',
-						'serialNumber' => $serialNumber, 						'signature' => array('algorithm' => $signatureAlgorithm),
-						'issuer' => false, 						'validity' => array(
-							'notBefore' => $this->_timeField($startDate), 							'notAfter' => $this->_timeField($endDate)							),
+						'serialNumber' => $serialNumber,
+						'signature' => array('algorithm' => $signatureAlgorithm),
+						'issuer' => false,
+						'validity' => array(
+							'notBefore' => $this->_timeField($startDate),
+							'notAfter' => $this->_timeField($endDate)
+						),
 						'subject' => $subject->dn,
 						'subjectPublicKeyInfo' => $subjectPublicKey
 					),
 					'signatureAlgorithm' => array('algorithm' => $signatureAlgorithm),
-					'signature'			=> false 			);
+					'signature'			=> false
+			);
 
-						$csrexts = $subject->getAttribute('pkcs-9-at-extensionRequest', 0);
+			$csrexts = $subject->getAttribute('pkcs-9-at-extensionRequest', 0);
 
 			if (!empty($csrexts)) {
 				$this->currentCert['tbsCertificate']['extensions'] = $csrexts;
@@ -2890,9 +2983,11 @@ class File_X509
 
 		if (isset($issuer->currentKeyIdentifier)) {
 			$this->setExtension('id-ce-authorityKeyIdentifier', array(
-																														'keyIdentifier' => $issuer->currentKeyIdentifier
+
+					'keyIdentifier' => $issuer->currentKeyIdentifier
 				));
-																	}
+
+		}
 
 		if (isset($subject->currentKeyIdentifier)) {
 			$this->setExtension('id-ce-subjectKeyIdentifier', $subject->currentKeyIdentifier);
@@ -2905,7 +3000,8 @@ class File_X509
 		}
 
 		if (isset($subject->ipAddresses) && count($subject->ipAddresses)) {
-									$ipAddresses = array();
+
+			$ipAddresses = array();
 			foreach ($subject->ipAddresses as $ipAddress) {
 				$encoded = $subject->_ipAddress($ipAddress);
 				if ($encoded !== false) {
@@ -2948,7 +3044,7 @@ class File_X509
 			}
 		}
 
-						$tbsCertificate = $this->currentCert['tbsCertificate'];
+		$tbsCertificate = $this->currentCert['tbsCertificate'];
 		$this->loadX509($this->saveX509($this->currentCert));
 
 		$result = $this->_sign($issuer->privateKey, $signatureAlgorithm);
@@ -2994,10 +3090,11 @@ class File_X509
 						'subjectPKInfo' => $publicKey
 					),
 					'signatureAlgorithm' => array('algorithm' => $signatureAlgorithm),
-					'signature'			=> false 			);
+					'signature'			=> false
+			);
 		}
 
-						$certificationRequestInfo = $this->currentCert['certificationRequestInfo'];
+		$certificationRequestInfo = $this->currentCert['certificationRequestInfo'];
 		$this->loadCSR($this->saveCSR($this->currentCert));
 
 		$result = $this->_sign($this->privateKey, $signatureAlgorithm);
@@ -3029,24 +3126,27 @@ class File_X509
 		$currentCert = isset($this->currentCert) ? $this->currentCert : null;
 		$signatureSubject = isset($this->signatureSubject) ? $this->signatureSubject: null;
 
-				if (isset($this->currentCert) && is_array($this->currentCert) && isset($this->currentCert['publicKeyAndChallenge'])) {
+		if (isset($this->currentCert) && is_array($this->currentCert) && isset($this->currentCert['publicKeyAndChallenge'])) {
 			$this->currentCert['signatureAlgorithm']['algorithm'] = $signatureAlgorithm;
 			$this->currentCert['publicKeyAndChallenge']['spki'] = $publicKey;
 			if (!empty($this->challenge)) {
-								$this->currentCert['publicKeyAndChallenge']['challenge'] = $this->challenge & str_repeat("\x7F", strlen($this->challenge));
+
+				$this->currentCert['publicKeyAndChallenge']['challenge'] = $this->challenge & str_repeat("\x7F", strlen($this->challenge));
 			}
 		} else {
 			$this->currentCert = array(
 				'publicKeyAndChallenge' =>
 					array(
 						'spki' => $publicKey,
-																																				'challenge' => !empty($this->challenge) ? $this->challenge : ''
+
+						'challenge' => !empty($this->challenge) ? $this->challenge : ''
 					),
 					'signatureAlgorithm' => array('algorithm' => $signatureAlgorithm),
-					'signature'			=> false 			);
+					'signature'			=> false
+			);
 		}
 
-						$publicKeyAndChallenge = $this->currentCert['publicKeyAndChallenge'];
+		$publicKeyAndChallenge = $this->currentCert['publicKeyAndChallenge'];
 		$this->loadSPKAC($this->saveSPKAC($this->currentCert));
 
 		$result = $this->_sign($this->privateKey, $signatureAlgorithm);
@@ -3083,9 +3183,12 @@ class File_X509
 					array(
 						'version' => 'v2',
 						'signature' => array('algorithm' => $signatureAlgorithm),
-						'issuer' => false, 						'thisUpdate' => $this->_timeField($thisUpdate) 					),
+						'issuer' => false,
+						'thisUpdate' => $this->_timeField($thisUpdate)
+					),
 					'signatureAlgorithm' => array('algorithm' => $signatureAlgorithm),
-					'signature'			=> false 			);
+					'signature'			=> false
+			);
 		}
 
 		$tbsCertList = &$this->currentCert['tbsCertList'];
@@ -3093,7 +3196,8 @@ class File_X509
 		$tbsCertList['thisUpdate'] = $this->_timeField($thisUpdate);
 
 		if (!empty($this->endDate)) {
-			$tbsCertList['nextUpdate'] = $this->_timeField($this->endDate); 		} else {
+			$tbsCertList['nextUpdate'] = $this->_timeField($this->endDate);
+		} else {
 			unset($tbsCertList['nextUpdate']);
 		}
 
@@ -3101,19 +3205,22 @@ class File_X509
 			$crlNumber = $this->serialNumber;
 		} else {
 			$crlNumber = $this->getExtension('id-ce-cRLNumber');
-																		$crlNumber = $crlNumber !== false ? $crlNumber->add(new Math_BigInteger(1)) : null;
+
+			$crlNumber = $crlNumber !== false ? $crlNumber->add(new Math_BigInteger(1)) : null;
 		}
 
 		$this->removeExtension('id-ce-authorityKeyIdentifier');
 		$this->removeExtension('id-ce-issuerAltName');
 
-				$version = isset($tbsCertList['version']) ? $tbsCertList['version'] : 0;
+		$version = isset($tbsCertList['version']) ? $tbsCertList['version'] : 0;
 		if (!$version) {
 			if (!empty($tbsCertList['crlExtensions'])) {
-				$version = 1; 			} elseif (!empty($tbsCertList['revokedCertificates'])) {
+				$version = 1;
+			} elseif (!empty($tbsCertList['revokedCertificates'])) {
 				foreach ($tbsCertList['revokedCertificates'] as $cert) {
 					if (!empty($cert['crlEntryExtensions'])) {
-						$version = 1; 					}
+						$version = 1;
+					}
 				}
 			}
 
@@ -3122,15 +3229,18 @@ class File_X509
 			}
 		}
 
-				if (!empty($tbsCertList['version'])) { 			if (!empty($crlNumber)) {
+		if (!empty($tbsCertList['version'])) {
+			if (!empty($crlNumber)) {
 				$this->setExtension('id-ce-cRLNumber', $crlNumber);
 			}
 
 			if (isset($issuer->currentKeyIdentifier)) {
 				$this->setExtension('id-ce-authorityKeyIdentifier', array(
-																																				'keyIdentifier' => $issuer->currentKeyIdentifier
+
+						'keyIdentifier' => $issuer->currentKeyIdentifier
 					));
-																							}
+
+			}
 
 			$issuerAltName = $this->getExtension('id-ce-subjectAltName', $issuer->currentCert);
 
@@ -3145,7 +3255,7 @@ class File_X509
 
 		unset($tbsCertList);
 
-						$tbsCertList = $this->currentCert['tbsCertList'];
+		$tbsCertList = $this->currentCert['tbsCertList'];
 		$this->loadCRL($this->saveCRL($this->currentCert));
 
 		$result = $this->_sign($issuer->privateKey, $signatureAlgorithm);
@@ -3348,7 +3458,8 @@ class File_X509
 		}
 
 		$extensions = array_values($extensions);
-				if (!isset($extensions[0])) {
+
+		if (!isset($extensions[0])) {
 			$extensions = array_splice($extensions, 0, 0);
 		}
 		return $result;
@@ -3593,7 +3704,8 @@ class File_X509
 			case !is_object($key):
 				return false;
 			case strtolower(get_class($key)) == 'file_asn1_element':
-								$asn1 = new File_ASN1();
+
+				$asn1 = new File_ASN1();
 				$decoded = $asn1->decodeBER($key->element);
 				if (empty($decoded)) {
 					return false;
@@ -3603,15 +3715,19 @@ class File_X509
 					return false;
 				}
 				$raw = base64_decode($raw);
-								if (!class_exists('Crypt_RSA')) {
+
+				if (!class_exists('Crypt_RSA')) {
 					include_once 'Crypt/RSA.php';
 				}
 				$key = new Crypt_RSA();
 				if (!$key->loadKey($raw)) {
-					return false;					}
-				if ($key->getPrivateKey() !== false) {						return $this->computeKeyIdentifier($key, $method);
+					return false;
 				}
-				$key = $raw;					break;
+				if ($key->getPrivateKey() !== false) {
+					return $this->computeKeyIdentifier($key, $method);
+				}
+				$key = $raw;
+				break;
 			case strtolower(get_class($key)) == 'file_x509':
 				if (isset($key->publicKey)) {
 					return $this->computeKeyIdentifier($key->publicKey, $method);
@@ -3623,13 +3739,14 @@ class File_X509
 					return $this->computeKeyIdentifier($key->currentCert, $method);
 				}
 				return false;
-			default: 				$key = $key->getPublicKey(CRYPT_RSA_PUBLIC_FORMAT_PKCS1);
+			default:
+				$key = $key->getPublicKey(CRYPT_RSA_PUBLIC_FORMAT_PKCS1);
 				break;
 		}
 
-				$key = $this->_extractBER($key);
+		$key = $this->_extractBER($key);
 
-				if (!class_exists('Crypt_Hash')) {
+		if (!class_exists('Crypt_Hash')) {
 			include_once 'Crypt/Hash.php';
 		}
 		$hash = new Crypt_Hash('sha1');
@@ -3651,7 +3768,8 @@ class File_X509
 
 		switch (strtolower(get_class($this->publicKey))) {
 			case 'crypt_rsa':
-																return array(
+
+				return array(
 					'algorithm' => array('algorithm' => 'rsaEncryption'),
 					'subjectPublicKey' => $this->publicKey->getPublicKey(CRYPT_RSA_PUBLIC_FORMAT_PKCS1)
 				);
@@ -3714,7 +3832,8 @@ class File_X509
 	{
 		if (isset($this->currentCert['tbsCertList'])) {
 			if (is_array($rclist = &$this->_subArray($this->currentCert, 'tbsCertList/revokedCertificates', true))) {
-				if ($this->_revokedCertificate($rclist, $serial) === false) { 					if (($i = $this->_revokedCertificate($rclist, $serial, true)) !== false) {
+				if ($this->_revokedCertificate($rclist, $serial) === false) {
+					if (($i = $this->_revokedCertificate($rclist, $serial, true)) !== false) {
 						if (!empty($date)) {
 							$rclist[$i]['revocationDate'] = $this->_timeField($date);
 						}
@@ -3830,9 +3949,16 @@ class File_X509
 	function _extractBER($str)
 	{
 
-		$temp = preg_replace('#.*?^-+[^-]+-+[\r\n ]*$#ms', '', $str, 1);
-				$temp = preg_replace('#-+[^-]+-+#', '', $temp);
-				$temp = str_replace(array("\r", "\n", ' '), '', $temp);
+		if (strlen($str) > ini_get('pcre.backtrack_limit')) {
+			$temp = $str;
+		} else {
+			$temp = preg_replace('#.*?^-+[^-]+-+[\r\n ]*$#ms', '', $str, 1);
+			$temp = preg_replace('#-+END.*[\r\n ]*.*#ms', '', $temp, 1);
+		}
+
+		$temp = str_replace(array("\r", "\n", ' '), '', $temp);
+
+		$temp = preg_replace('#^-+[^-]+-+|-+[^-]+-+$#', '', $temp);
 		$temp = preg_match('#^[a-zA-Z\d/+]*={0,2}$#', $temp) ? base64_decode($temp) : false;
 		return $temp != false ? $temp : $str;
 	}

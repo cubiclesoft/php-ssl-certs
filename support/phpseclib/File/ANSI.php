@@ -86,7 +86,8 @@ class File_ANSI
 			if (strlen($this->ansi)) {
 				$this->ansi.= $source[$i];
 				$chr = ord($source[$i]);
-												switch (true) {
+
+				switch (true) {
 					case $this->ansi == "\x1B=":
 						$this->ansi = '';
 						continue 2;
@@ -98,12 +99,15 @@ class File_ANSI
 				}
 				$this->tokenization[] = $this->ansi;
 				$this->tokenization[] = '';
-								switch ($this->ansi) {
-					case "\x1B[H": 						$this->old_x = $this->x;
+
+				switch ($this->ansi) {
+					case "\x1B[H":
+						$this->old_x = $this->x;
 						$this->old_y = $this->y;
 						$this->x = $this->y = 0;
 						break;
-					case "\x1B[J": 						$this->history = array_merge($this->history, array_slice(array_splice($this->screen, $this->y + 1), 0, $this->old_y));
+					case "\x1B[J":
+						$this->history = array_merge($this->history, array_slice(array_splice($this->screen, $this->y + 1), 0, $this->old_y));
 						$this->screen = array_merge($this->screen, array_fill($this->y, $this->max_y, ''));
 
 						$this->history_attrs = array_merge($this->history_attrs, array_slice(array_splice($this->attrs, $this->y + 1), 0, $this->old_y));
@@ -113,84 +117,108 @@ class File_ANSI
 							array_shift($this->history);
 							array_shift($this->history_attrs);
 						}
-					case "\x1B[K": 						$this->screen[$this->y] = substr($this->screen[$this->y], 0, $this->x);
+					case "\x1B[K":
+						$this->screen[$this->y] = substr($this->screen[$this->y], 0, $this->x);
 
-						array_splice($this->attrs[$this->y], $this->x + 1, $this->max_x - $this->x, array_fill($this->x, $this->max_x - $this->x - 1, $this->base_attr_cell));
+						array_splice($this->attrs[$this->y], $this->x + 1, $this->max_x - $this->x, array_fill($this->x, $this->max_x - ($this->x - 1), $this->base_attr_cell));
 						break;
-					case "\x1B[2K": 						$this->screen[$this->y] = str_repeat(' ', $this->x);
+					case "\x1B[2K":
+						$this->screen[$this->y] = str_repeat(' ', $this->x);
 						$this->attrs[$this->y] = $this->attr_row;
 						break;
-					case "\x1B[?1h": 					case "\x1B[?25h": 					case "\x1B(B": 						break;
-					case "\x1BE": 						$this->_newLine();
+					case "\x1B[?1h":
+					case "\x1B[?25h":
+					case "\x1B(B":
+						break;
+					case "\x1BE":
+						$this->_newLine();
 						$this->x = 0;
 						break;
 					default:
 						switch (true) {
-							case preg_match('#\x1B\[(\d+)B#', $this->ansi, $match): 								$this->old_y = $this->y;
+							case preg_match('#\x1B\[(\d+)B#', $this->ansi, $match):
+								$this->old_y = $this->y;
 								$this->y+= $match[1];
 								break;
-							case preg_match('#\x1B\[(\d+);(\d+)H#', $this->ansi, $match): 								$this->old_x = $this->x;
+							case preg_match('#\x1B\[(\d+);(\d+)H#', $this->ansi, $match):
+								$this->old_x = $this->x;
 								$this->old_y = $this->y;
 								$this->x = $match[2] - 1;
 								$this->y = $match[1] - 1;
 								break;
-							case preg_match('#\x1B\[(\d+)C#', $this->ansi, $match): 								$this->old_x = $this->x;
+							case preg_match('#\x1B\[(\d+)C#', $this->ansi, $match):
+								$this->old_x = $this->x;
 								$this->x+= $match[1];
 								break;
-							case preg_match('#\x1B\[(\d+)D#', $this->ansi, $match): 								$this->old_x = $this->x;
+							case preg_match('#\x1B\[(\d+)D#', $this->ansi, $match):
+								$this->old_x = $this->x;
 								$this->x-= $match[1];
 								if ($this->x < 0) {
 									$this->x = 0;
 								}
 								break;
-							case preg_match('#\x1B\[(\d+);(\d+)r#', $this->ansi, $match): 								break;
-							case preg_match('#\x1B\[(\d*(?:;\d*)*)m#', $this->ansi, $match): 								$attr_cell = &$this->attr_cell;
+							case preg_match('#\x1B\[(\d+);(\d+)r#', $this->ansi, $match):
+								break;
+							case preg_match('#\x1B\[(\d*(?:;\d*)*)m#', $this->ansi, $match):
+								$attr_cell = &$this->attr_cell;
 								$mods = explode(';', $match[1]);
 								foreach ($mods as $mod) {
 									switch ($mod) {
-										case 0: 											$attr_cell = clone($this->base_attr_cell);
+										case '':
+										case '0':
+											$attr_cell = clone($this->base_attr_cell);
 											break;
-										case 1: 											$attr_cell->bold = true;
+										case '1':
+											$attr_cell->bold = true;
 											break;
-										case 4: 											$attr_cell->underline = true;
+										case '4':
+											$attr_cell->underline = true;
 											break;
-										case 5: 											$attr_cell->blink = true;
+										case '5':
+											$attr_cell->blink = true;
 											break;
-										case 7: 											$attr_cell->reverse = !$attr_cell->reverse;
+										case '7':
+											$attr_cell->reverse = !$attr_cell->reverse;
 											$temp = $attr_cell->background;
 											$attr_cell->background = $attr_cell->foreground;
 											$attr_cell->foreground = $temp;
 											break;
-										default: 																						$front = &$attr_cell->{ $attr_cell->reverse ? 'background' : 'foreground' };
-																						$back = &$attr_cell->{ $attr_cell->reverse ? 'foreground' : 'background' };
-											switch ($mod) {
-																								case 30: $front = 'black'; break;
-												case 31: $front = 'red'; break;
-												case 32: $front = 'green'; break;
-												case 33: $front = 'yellow'; break;
-												case 34: $front = 'blue'; break;
-												case 35: $front = 'magenta'; break;
-												case 36: $front = 'cyan'; break;
-												case 37: $front = 'white'; break;
+										default:
 
-												case 40: $back = 'black'; break;
-												case 41: $back = 'red'; break;
-												case 42: $back = 'green'; break;
-												case 43: $back = 'yellow'; break;
-												case 44: $back = 'blue'; break;
-												case 45: $back = 'magenta'; break;
-												case 46: $back = 'cyan'; break;
-												case 47: $back = 'white'; break;
+											$front = &$attr_cell->{ $attr_cell->reverse ? 'background' : 'foreground' };
+
+											$back = &$attr_cell->{ $attr_cell->reverse ? 'foreground' : 'background' };
+											switch ($mod) {
+
+												case '30': $front = 'black'; break;
+												case '31': $front = 'red'; break;
+												case '32': $front = 'green'; break;
+												case '33': $front = 'yellow'; break;
+												case '34': $front = 'blue'; break;
+												case '35': $front = 'magenta'; break;
+												case '36': $front = 'cyan'; break;
+												case '37': $front = 'white'; break;
+
+												case '40': $back = 'black'; break;
+												case '41': $back = 'red'; break;
+												case '42': $back = 'green'; break;
+												case '43': $back = 'yellow'; break;
+												case '44': $back = 'blue'; break;
+												case '45': $back = 'magenta'; break;
+												case '46': $back = 'cyan'; break;
+												case '47': $back = 'white'; break;
 
 												default:
-																										$this->ansi = '';
+
+													$this->ansi = '';
 													break 2;
 											}
 									}
 								}
 								break;
 							default:
-														}
+
+						}
 				}
 				$this->ansi = '';
 				continue;
@@ -204,7 +232,8 @@ class File_ANSI
 				case "\n":
 					$this->_newLine();
 					break;
-				case "\x08": 					if ($this->x) {
+				case "\x08":
+					if ($this->x) {
 						$this->x--;
 						$this->attrs[$this->y][$this->x] = clone($this->base_attr_cell);
 						$this->screen[$this->y] = substr_replace(
@@ -215,9 +244,12 @@ class File_ANSI
 						);
 					}
 					break;
-				case "\x0F": 					break;
-				case "\x1B": 					$this->tokenization[count($this->tokenization) - 1] = substr($this->tokenization[count($this->tokenization) - 1], 0, -1);
-																				$this->ansi.= "\x1B";
+				case "\x0F":
+					break;
+				case "\x1B":
+					$this->tokenization[count($this->tokenization) - 1] = substr($this->tokenization[count($this->tokenization) - 1], 0, -1);
+
+					$this->ansi.= "\x1B";
 					break;
 				default:
 					$this->attrs[$this->y][$this->x] = clone($this->attr_cell);
@@ -325,7 +357,8 @@ class File_ANSI
 			$output.= "\r\n";
 		}
 		$output = substr($output, 0, -2);
-				$output.= $this->_processCoordinate($last_attr, $this->base_attr_cell, '');
+
+		$output.= $this->_processCoordinate($last_attr, $this->base_attr_cell, '');
 		return rtrim($output);
 	}
 

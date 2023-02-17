@@ -111,7 +111,9 @@ class Crypt_Rijndael extends Crypt_Base
 				break;
 			case CRYPT_ENGINE_MCRYPT:
 				$this->cipher_name_mcrypt = 'rijndael-' . ($this->block_size << 3);
-				if ($this->key_length % 8) { 										return false;
+				if ($this->key_length % 8) {
+
+					return false;
 				}
 		}
 
@@ -138,14 +140,15 @@ class Crypt_Rijndael extends Crypt_Base
 		$Nb = $this->Nb;
 		$Nr = $this->Nr;
 
-				$wc = $Nb - 1;
+		$wc = $Nb - 1;
 		foreach ($words as $word) {
 			$state[] = $word ^ $w[++$wc];
 		}
 
-				$temp = array();
+		$temp = array();
 		for ($round = 1; $round < $Nr; ++$round) {
-			$i = 0; 			$j = $c[1];
+			$i = 0;
+			$j = $c[1];
 			$k = $c[2];
 			$l = $c[3];
 
@@ -163,18 +166,19 @@ class Crypt_Rijndael extends Crypt_Base
 			$state = $temp;
 		}
 
-				for ($i = 0; $i < $Nb; ++$i) {
+		for ($i = 0; $i < $Nb; ++$i) {
 			$state[$i] =	$sbox[$state[$i]		& 0x000000FF]		|
 							($sbox[$state[$i] >>	8 & 0x000000FF] <<	8) |
 							($sbox[$state[$i] >> 16 & 0x000000FF] << 16) |
 							($sbox[$state[$i] >> 24 & 0x000000FF] << 24);
 		}
 
-				$i = 0; 		$j = $c[1];
+		$i = 0;
+		$j = $c[1];
 		$k = $c[2];
 		$l = $c[3];
 		while ($i < $Nb) {
-			$temp[$i] = ($state[$i] & 0xFF000000) ^
+			$temp[$i] = ($state[$i] & intval(0xFF000000)) ^
 						($state[$j] & 0x00FF0000) ^
 						($state[$k] & 0x0000FF00) ^
 						($state[$l] & 0x000000FF) ^
@@ -219,14 +223,15 @@ class Crypt_Rijndael extends Crypt_Base
 		$Nb = $this->Nb;
 		$Nr = $this->Nr;
 
-				$wc = $Nb - 1;
+		$wc = $Nb - 1;
 		foreach ($words as $word) {
 			$state[] = $word ^ $dw[++$wc];
 		}
 
 		$temp = array();
 		for ($round = $Nr - 1; $round > 0; --$round) {
-			$i = 0; 			$j = $Nb - $c[1];
+			$i = 0;
+			$j = $Nb - $c[1];
 			$k = $Nb - $c[2];
 			$l = $Nb - $c[3];
 
@@ -244,12 +249,13 @@ class Crypt_Rijndael extends Crypt_Base
 			$state = $temp;
 		}
 
-				$i = 0; 		$j = $Nb - $c[1];
+		$i = 0;
+		$j = $Nb - $c[1];
 		$k = $Nb - $c[2];
 		$l = $Nb - $c[3];
 
 		while ($i < $Nb) {
-			$word = ($state[$i] & 0xFF000000) |
+			$word = ($state[$i] & intval(0xFF000000)) |
 					($state[$j] & 0x00FF0000) |
 					($state[$k] & 0x0000FF00) |
 					($state[$l] & 0x000000FF);
@@ -280,24 +286,32 @@ class Crypt_Rijndael extends Crypt_Base
 
 	function _setupKey()
 	{
-						static $rcon = array(0,
-			0x01000000, 0x02000000, 0x04000000, 0x08000000, 0x10000000,
-			0x20000000, 0x40000000, 0x80000000, 0x1B000000, 0x36000000,
-			0x6C000000, 0xD8000000, 0xAB000000, 0x4D000000, 0x9A000000,
-			0x2F000000, 0x5E000000, 0xBC000000, 0x63000000, 0xC6000000,
-			0x97000000, 0x35000000, 0x6A000000, 0xD4000000, 0xB3000000,
-			0x7D000000, 0xFA000000, 0xEF000000, 0xC5000000, 0x91000000
-		);
+
+		static $rcon;
+
+		if (!isset($rcon)) {
+			$rcon = array(0,
+				0x01000000, 0x02000000, 0x04000000, 0x08000000, 0x10000000,
+				0x20000000, 0x40000000, 0x80000000, 0x1B000000, 0x36000000,
+				0x6C000000, 0xD8000000, 0xAB000000, 0x4D000000, 0x9A000000,
+				0x2F000000, 0x5E000000, 0xBC000000, 0x63000000, 0xC6000000,
+				0x97000000, 0x35000000, 0x6A000000, 0xD4000000, 0xB3000000,
+				0x7D000000, 0xFA000000, 0xEF000000, 0xC5000000, 0x91000000
+			);
+			$rcon = array_map('intval', $rcon);
+		}
 
 		if (isset($this->kl['key']) && $this->key === $this->kl['key'] && $this->key_length === $this->kl['key_length'] && $this->block_size === $this->kl['block_size']) {
-						return;
+
+			return;
 		}
 		$this->kl = array('key' => $this->key, 'key_length' => $this->key_length, 'block_size' => $this->block_size);
 
 		$this->Nk = $this->key_length >> 2;
-				$this->Nr = max($this->Nk, $this->Nb) + 6;
 
-										switch ($this->Nb) {
+		$this->Nr = max($this->Nk, $this->Nb) + 6;
+
+		switch ($this->Nb) {
 			case 4:
 			case 5:
 			case 6:
@@ -316,21 +330,24 @@ class Crypt_Rijndael extends Crypt_Base
 		for ($i = $this->Nk; $i < $length; $i++) {
 			$temp = $w[$i - 1];
 			if ($i % $this->Nk == 0) {
-																				$temp = (($temp << 8) & 0xFFFFFF00) | (($temp >> 24) & 0x000000FF); 				$temp = $this->_subWord($temp) ^ $rcon[$i / $this->Nk];
+
+				$temp = (($temp << 8) & intval(0xFFFFFF00)) | (($temp >> 24) & 0x000000FF);
+				$temp = $this->_subWord($temp) ^ $rcon[$i / $this->Nk];
 			} elseif ($this->Nk > 6 && $i % $this->Nk == 4) {
 				$temp = $this->_subWord($temp);
 			}
 			$w[$i] = $w[$i - $this->Nk] ^ $temp;
 		}
 
-																list($dt0, $dt1, $dt2, $dt3) = $this->_getInvTables();
+		list($dt0, $dt1, $dt2, $dt3) = $this->_getInvTables();
 		$temp = $this->w = $this->dw = array();
 		for ($i = $row = $col = 0; $i < $length; $i++, $col++) {
 			if ($col == $this->Nb) {
 				if ($row == 0) {
 					$this->dw[0] = $this->w[0];
 				} else {
-										$j = 0;
+
+					$j = 0;
 					while ($j < $this->Nb) {
 						$dw = $this->_subWord($this->w[$row][$j]);
 						$temp[$j] = $dt0[$dw >> 24 & 0x000000FF] ^
@@ -350,7 +367,7 @@ class Crypt_Rijndael extends Crypt_Base
 
 		$this->dw[$row] = $this->w[$row];
 
-				$this->dw = array_reverse($this->dw);
+		$this->dw = array_reverse($this->dw);
 		$w	= array_pop($this->w);
 		$dw = array_pop($this->dw);
 		foreach ($this->w as $r => $wr) {
@@ -380,8 +397,10 @@ class Crypt_Rijndael extends Crypt_Base
 	{
 		static $tables;
 		if (empty($tables)) {
-												$t3 = array_map('intval', array(
-												0x6363A5C6, 0x7C7C84F8, 0x777799EE, 0x7B7B8DF6, 0xF2F20DFF, 0x6B6BBDD6, 0x6F6FB1DE, 0xC5C55491,
+
+			$t3 = array_map('intval', array(
+
+				0x6363A5C6, 0x7C7C84F8, 0x777799EE, 0x7B7B8DF6, 0xF2F20DFF, 0x6B6BBDD6, 0x6F6FB1DE, 0xC5C55491,
 				0x30305060, 0x01010302, 0x6767A9CE, 0x2B2B7D56, 0xFEFE19E7, 0xD7D762B5, 0xABABE64D, 0x76769AEC,
 				0xCACA458F, 0x82829D1F, 0xC9C94089, 0x7D7D87FA, 0xFAFA15EF, 0x5959EBB2, 0x4747C98E, 0xF0F00BFB,
 				0xADADEC41, 0xD4D467B3, 0xA2A2FD5F, 0xAFAFEA45, 0x9C9CBF23, 0xA4A4F753, 0x727296E4, 0xC0C05B9B,
@@ -416,17 +435,19 @@ class Crypt_Rijndael extends Crypt_Base
 			));
 
 			foreach ($t3 as $t3i) {
-				$t0[] = (($t3i << 24) & 0xFF000000) | (($t3i >>	8) & 0x00FFFFFF);
-				$t1[] = (($t3i << 16) & 0xFFFF0000) | (($t3i >> 16) & 0x0000FFFF);
-				$t2[] = (($t3i <<	8) & 0xFFFFFF00) | (($t3i >> 24) & 0x000000FF);
+				$t0[] = (($t3i << 24) & intval(0xFF000000)) | (($t3i >>	8) & 0x00FFFFFF);
+				$t1[] = (($t3i << 16) & intval(0xFFFF0000)) | (($t3i >> 16) & 0x0000FFFF);
+				$t2[] = (($t3i <<	8) & intval(0xFFFFFF00)) | (($t3i >> 24) & 0x000000FF);
 			}
 
 			$tables = array(
-								$t0,
+
+				$t0,
 				$t1,
 				$t2,
 				$t3,
-								array(
+
+				array(
 					0x63, 0x7C, 0x77, 0x7B, 0xF2, 0x6B, 0x6F, 0xC5, 0x30, 0x01, 0x67, 0x2B, 0xFE, 0xD7, 0xAB, 0x76,
 					0xCA, 0x82, 0xC9, 0x7D, 0xFA, 0x59, 0x47, 0xF0, 0xAD, 0xD4, 0xA2, 0xAF, 0x9C, 0xA4, 0x72, 0xC0,
 					0xB7, 0xFD, 0x93, 0x26, 0x36, 0x3F, 0xF7, 0xCC, 0x34, 0xA5, 0xE5, 0xF1, 0x71, 0xD8, 0x31, 0x15,
@@ -489,17 +510,19 @@ class Crypt_Rijndael extends Crypt_Base
 			));
 
 			foreach ($dt3 as $dt3i) {
-				$dt0[] = (($dt3i << 24) & 0xFF000000) | (($dt3i >>	8) & 0x00FFFFFF);
-				$dt1[] = (($dt3i << 16) & 0xFFFF0000) | (($dt3i >> 16) & 0x0000FFFF);
-				$dt2[] = (($dt3i <<	8) & 0xFFFFFF00) | (($dt3i >> 24) & 0x000000FF);
+				$dt0[] = (($dt3i << 24) & intval(0xFF000000)) | (($dt3i >>	8) & 0x00FFFFFF);
+				$dt1[] = (($dt3i << 16) & intval(0xFFFF0000)) | (($dt3i >> 16) & 0x0000FFFF);
+				$dt2[] = (($dt3i <<	8) & intval(0xFFFFFF00)) | (($dt3i >> 24) & 0x000000FF);
 			};
 
 			$tables = array(
-								$dt0,
+
+				$dt0,
 				$dt1,
 				$dt2,
 				$dt3,
-								array(
+
+				array(
 					0x52, 0x09, 0x6A, 0xD5, 0x30, 0x36, 0xA5, 0x38, 0xBF, 0x40, 0xA3, 0x9E, 0x81, 0xF3, 0xD7, 0xFB,
 					0x7C, 0xE3, 0x39, 0x82, 0x9B, 0x2F, 0xFF, 0x87, 0x34, 0x8E, 0x43, 0x44, 0xC4, 0xDE, 0xE9, 0xCB,
 					0x54, 0x7B, 0x94, 0x32, 0xA6, 0xC2, 0x23, 0x3D, 0xEE, 0x4C, 0x95, 0x0B, 0x42, 0xFA, 0xC3, 0x4E,
@@ -527,9 +550,9 @@ class Crypt_Rijndael extends Crypt_Base
 
 		$lambda_functions =& Crypt_Rijndael::_getLambdaFunctions();
 
-								$gen_hi_opt_code = (bool)(count($lambda_functions) < 10);
+		$gen_hi_opt_code = (bool)(count($lambda_functions) < 10);
 
-				$code_hash = "Crypt_Rijndael, {$this->mode}, {$this->Nr}, {$this->Nb}";
+		$code_hash = "Crypt_Rijndael, {$this->mode}, {$this->Nr}, {$this->Nb}";
 		if ($gen_hi_opt_code) {
 			$code_hash = str_pad($code_hash, 32) . $this->_hashInlineCryptFunction($this->key);
 		}
@@ -537,7 +560,8 @@ class Crypt_Rijndael extends Crypt_Base
 		if (!isset($lambda_functions[$code_hash])) {
 			switch (true) {
 				case $gen_hi_opt_code:
-										$w	= $this->w;
+
+					$w	= $this->w;
 					$dw = $this->dw;
 					$init_encrypt = '';
 					$init_decrypt = '';
@@ -555,7 +579,7 @@ class Crypt_Rijndael extends Crypt_Base
 			$Nb = $this->Nb;
 			$c	= $this->c;
 
-						$init_encrypt.= '
+			$init_encrypt.= '
                 static $tables;
                 if (empty($tables)) {
                     $tables = &$self->_getTables();
@@ -571,12 +595,12 @@ class Crypt_Rijndael extends Crypt_Base
 			$e	= 's';
 			$wc = $Nb - 1;
 
-						$encrypt_block = '$in = unpack("N*", $in);'."\n";
+			$encrypt_block = '$in = unpack("N*", $in);'."\n";
 			for ($i = 0; $i < $Nb; ++$i) {
 				$encrypt_block .= '$s'.$i.' = $in['.($i + 1).'] ^ '.$w[++$wc].";\n";
 			}
 
-						for ($round = 1; $round < $Nr; ++$round) {
+			for ($round = 1; $round < $Nr; ++$round) {
 				list($s, $e) = array($e, $s);
 				for ($i = 0; $i < $Nb; ++$i) {
 					$encrypt_block.=
@@ -589,7 +613,7 @@ class Crypt_Rijndael extends Crypt_Base
 				}
 			}
 
-						for ($i = 0; $i < $Nb; ++$i) {
+			for ($i = 0; $i < $Nb; ++$i) {
 				$encrypt_block.=
 					'$'.$e.$i.' =
                      $sbox[ $'.$e.$i.'        & 0xff]        |
@@ -608,7 +632,7 @@ class Crypt_Rijndael extends Crypt_Base
 			}
 			$encrypt_block .= ');';
 
-						$init_decrypt.= '
+			$init_decrypt.= '
                 static $invtables;
                 if (empty($invtables)) {
                     $invtables = &$self->_getInvTables();
@@ -624,12 +648,12 @@ class Crypt_Rijndael extends Crypt_Base
 			$e	= 's';
 			$wc = $Nb - 1;
 
-						$decrypt_block = '$in = unpack("N*", $in);'."\n";
+			$decrypt_block = '$in = unpack("N*", $in);'."\n";
 			for ($i = 0; $i < $Nb; ++$i) {
 				$decrypt_block .= '$s'.$i.' = $in['.($i + 1).'] ^ '.$dw[++$wc].';'."\n";
 			}
 
-						for ($round = 1; $round < $Nr; ++$round) {
+			for ($round = 1; $round < $Nr; ++$round) {
 				list($s, $e) = array($e, $s);
 				for ($i = 0; $i < $Nb; ++$i) {
 					$decrypt_block.=
@@ -642,7 +666,7 @@ class Crypt_Rijndael extends Crypt_Base
 				}
 			}
 
-						for ($i = 0; $i < $Nb; ++$i) {
+			for ($i = 0; $i < $Nb; ++$i) {
 				$decrypt_block.=
 					'$'.$e.$i.' =
                      $isbox[ $'.$e.$i.'        & 0xff]        |

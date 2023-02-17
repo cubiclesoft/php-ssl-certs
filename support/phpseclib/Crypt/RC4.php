@@ -37,6 +37,10 @@ class Crypt_RC4 extends Crypt_Base
 	function isValidEngine($engine)
 	{
 		if ($engine == CRYPT_ENGINE_OPENSSL) {
+
+			if (defined('OPENSSL_VERSION_TEXT') && version_compare(preg_replace('#OpenSSL (\d+\.\d+\.\d+) .*#', '$1', OPENSSL_VERSION_TEXT), '3.0.1', '>=')) {
+				return false;
+			}
 			if (version_compare(PHP_VERSION, '5.3.7') >= 0) {
 				$this->cipher_name_openssl = 'rc4-40';
 			} else {
@@ -107,7 +111,9 @@ class Crypt_RC4 extends Crypt_Base
 
 		$this->stream = array();
 		$this->stream[CRYPT_RC4_DECRYPT] = $this->stream[CRYPT_RC4_ENCRYPT] = array(
-			0, 			0, 			$keyStream
+			0,
+			0,
+			$keyStream
 		);
 	}
 

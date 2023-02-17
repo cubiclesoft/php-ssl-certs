@@ -34,7 +34,8 @@ class Crypt_DES extends Crypt_Base
 		CRYPT_MODE_CBC => 'des-cbc',
 		CRYPT_MODE_CFB => 'des-cfb',
 		CRYPT_MODE_OFB => 'des-ofb'
-			);
+
+	);
 
 	var $cfb_init_len = 500;
 
@@ -401,6 +402,10 @@ class Crypt_DES extends Crypt_Base
 	{
 		if ($this->key_length_max == 8) {
 			if ($engine == CRYPT_ENGINE_OPENSSL) {
+
+				if (defined('OPENSSL_VERSION_TEXT') && version_compare(preg_replace('#OpenSSL (\d+\.\d+\.\d+) .*#', '$1', OPENSSL_VERSION_TEXT), '3.0.1', '>=')) {
+					return false;
+				}
 				$this->cipher_name_openssl_ecb = 'des-ecb';
 				$this->cipher_name_openssl = 'des-' . $this->_openssl_translate_mode();
 			}
@@ -411,11 +416,12 @@ class Crypt_DES extends Crypt_Base
 
 	function setKey($key)
 	{
-						if (strlen($key) > $this->key_length_max) {
+
+		if (strlen($key) > $this->key_length_max) {
 			$key = substr($key, 0, $this->key_length_max);
 		}
 
-				parent::setKey($key);
+		parent::setKey($key);
 	}
 
 	function _encryptBlock($in)
@@ -450,7 +456,7 @@ class Crypt_DES extends Crypt_Base
 		$keys	= $this->keys[$mode];
 		$ki	= -1;
 
-				$t = unpack('Nl/Nr', $block);
+		$t = unpack('Nl/Nr', $block);
 		list($l, $r) = array($t['l'], $t['r']);
 		$block = ($shuffleip[ $r		& 0xFF] & "\x80\x80\x80\x80\x80\x80\x80\x80") |
 				 ($shuffleip[($r >>	8) & 0xFF] & "\x40\x40\x40\x40\x40\x40\x40\x40") |
@@ -461,15 +467,17 @@ class Crypt_DES extends Crypt_Base
 				 ($shuffleip[($l >> 16) & 0xFF] & "\x02\x02\x02\x02\x02\x02\x02\x02") |
 				 ($shuffleip[($l >> 24) & 0xFF] & "\x01\x01\x01\x01\x01\x01\x01\x01");
 
-				$t = unpack('Nl/Nr', $block);
+		$t = unpack('Nl/Nr', $block);
 		list($l, $r) = array($t['l'], $t['r']);
 
 		for ($des_round = 0; $des_round < $this->des_rounds; ++$des_round) {
-						for ($i = 0; $i < 16; $i++) {
-																$b1 = (($r >>	3) & 0x1FFFFFFF) ^ ($r << 29) ^ $keys[++$ki];
+
+			for ($i = 0; $i < 16; $i++) {
+
+				$b1 = (($r >>	3) & 0x1FFFFFFF) ^ ($r << 29) ^ $keys[++$ki];
 				$b2 = (($r >> 31) & 0x00000001) ^ ($r <<	1) ^ $keys[++$ki];
 
-								$t = $sbox1[($b1 >> 24) & 0x3F] ^ $sbox2[($b2 >> 24) & 0x3F] ^
+				$t = $sbox1[($b1 >> 24) & 0x3F] ^ $sbox2[($b2 >> 24) & 0x3F] ^
 					 $sbox3[($b1 >> 16) & 0x3F] ^ $sbox4[($b2 >> 16) & 0x3F] ^
 					 $sbox5[($b1 >>	8) & 0x3F] ^ $sbox6[($b2 >>	8) & 0x3F] ^
 					 $sbox7[ $b1		& 0x3F] ^ $sbox8[ $b2		& 0x3F] ^ $l;
@@ -478,12 +486,12 @@ class Crypt_DES extends Crypt_Base
 				$r = $t;
 			}
 
-						$t = $l;
+			$t = $l;
 			$l = $r;
 			$r = $t;
 		}
 
-				return ($shuffleinvip[($r >> 24) & 0xFF] & "\x80\x80\x80\x80\x80\x80\x80\x80") |
+		return ($shuffleinvip[($r >> 24) & 0xFF] & "\x80\x80\x80\x80\x80\x80\x80\x80") |
 				($shuffleinvip[($l >> 24) & 0xFF] & "\x40\x40\x40\x40\x40\x40\x40\x40") |
 				($shuffleinvip[($r >> 16) & 0xFF] & "\x20\x20\x20\x20\x20\x20\x20\x20") |
 				($shuffleinvip[($l >> 16) & 0xFF] & "\x10\x10\x10\x10\x10\x10\x10\x10") |
@@ -496,11 +504,13 @@ class Crypt_DES extends Crypt_Base
 	function _setupKey()
 	{
 		if (isset($this->kl['key']) && $this->key === $this->kl['key'] && $this->des_rounds === $this->kl['des_rounds']) {
-						return;
+
+			return;
 		}
 		$this->kl = array('key' => $this->key, 'des_rounds' => $this->des_rounds);
 
-		static $shifts = array( 			1, 1, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 1
+		static $shifts = array(
+			1, 1, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 1
 		);
 
 		static $pc1map = array(
@@ -538,7 +548,7 @@ class Crypt_DES extends Crypt_Base
 			0xF2, 0xF2, 0xFA, 0xFA, 0xF6, 0xF6, 0xFE, 0xFE
 		);
 
-				static $pc2mapc1 = array(
+		static $pc2mapc1 = array(
 			0x00000000, 0x00000400, 0x00200000, 0x00200400,
 			0x00000001, 0x00000401, 0x00200001, 0x00200401,
 			0x02000000, 0x02000400, 0x02200000, 0x02200400,
@@ -949,9 +959,10 @@ class Crypt_DES extends Crypt_Base
 
 		$keys = array();
 		for ($des_round = 0; $des_round < $this->des_rounds; ++$des_round) {
-						$key = str_pad(substr($this->key, $des_round * 8, 8), 8, "\0");
 
-						$t = unpack('Nl/Nr', $key);
+			$key = str_pad(substr($this->key, $des_round * 8, 8), 8, "\0");
+
+			$t = unpack('Nl/Nr', $key);
 			list($l, $r) = array($t['l'], $t['r']);
 			$key = ($this->shuffle[$pc1map[ $r		& 0xFF]] & "\x80\x80\x80\x80\x80\x80\x80\x00") |
 					($this->shuffle[$pc1map[($r >>	8) & 0xFF]] & "\x40\x40\x40\x40\x40\x40\x40\x00") |
@@ -975,14 +986,14 @@ class Crypt_DES extends Crypt_Base
 				$d <<= $shifts[$i];
 				$d = ($d | ($d >> 28)) & 0x0FFFFFFF;
 
-								$cp = $pc2mapc1[ $c >> 24		] | $pc2mapc2[($c >> 16) & 0xFF] |
+				$cp = $pc2mapc1[ $c >> 24		] | $pc2mapc2[($c >> 16) & 0xFF] |
 						$pc2mapc3[($c >>	8) & 0xFF] | $pc2mapc4[ $c		& 0xFF];
 				$dp = $pc2mapd1[ $d >> 24		] | $pc2mapd2[($d >> 16) & 0xFF] |
 						$pc2mapd3[($d >>	8) & 0xFF] | $pc2mapd4[ $d		& 0xFF];
 
-								$val1 = ( $cp		& 0xFF000000) | (($cp <<	8) & 0x00FF0000) |
+				$val1 = ( $cp		& intval(0xFF000000)) | (($cp <<	8) & 0x00FF0000) |
 						(($dp >> 16) & 0x0000FF00) | (($dp >>	8) & 0x000000FF);
-				$val2 = (($cp <<	8) & 0xFF000000) | (($cp << 16) & 0x00FF0000) |
+				$val2 = (($cp <<	8) & intval(0xFF000000)) | (($cp << 16) & 0x00FF0000) |
 						(($dp >>	8) & 0x0000FF00) | ( $dp		& 0x000000FF);
 				$keys[$des_round][CRYPT_DES_ENCRYPT][		] = $val1;
 				$keys[$des_round][CRYPT_DES_DECRYPT][$ki - 1] = $val1;
@@ -992,7 +1003,8 @@ class Crypt_DES extends Crypt_Base
 		}
 
 		switch ($this->des_rounds) {
-			case 3: 				$this->keys = array(
+			case 3:
+				$this->keys = array(
 					CRYPT_DES_ENCRYPT => array_merge(
 						$keys[0][CRYPT_DES_ENCRYPT],
 						$keys[1][CRYPT_DES_DECRYPT],
@@ -1005,7 +1017,8 @@ class Crypt_DES extends Crypt_Base
 					)
 				);
 				break;
-						default:
+
+			default:
 				$this->keys = array(
 					CRYPT_DES_ENCRYPT => $keys[0][CRYPT_DES_ENCRYPT],
 					CRYPT_DES_DECRYPT => $keys[0][CRYPT_DES_DECRYPT]
@@ -1017,17 +1030,19 @@ class Crypt_DES extends Crypt_Base
 	{
 		$lambda_functions =& Crypt_DES::_getLambdaFunctions();
 
-								$des_rounds = $this->des_rounds;
+		$des_rounds = $this->des_rounds;
 
-										$gen_hi_opt_code = (bool)( count($lambda_functions) < 10 );
+		$gen_hi_opt_code = (bool)( count($lambda_functions) < 10 );
 
-				$code_hash = "Crypt_DES, $des_rounds, {$this->mode}";
+		$code_hash = "Crypt_DES, $des_rounds, {$this->mode}";
 		if ($gen_hi_opt_code) {
-																		$code_hash = str_pad($code_hash, 32) . $this->_hashInlineCryptFunction($this->key);
+
+			$code_hash = str_pad($code_hash, 32) . $this->_hashInlineCryptFunction($this->key);
 		}
 
-				if (!isset($lambda_functions[$code_hash])) {
-						$init_crypt = 'static $sbox1, $sbox2, $sbox3, $sbox4, $sbox5, $sbox6, $sbox7, $sbox8, $shuffleip, $shuffleinvip;
+		if (!isset($lambda_functions[$code_hash])) {
+
+			$init_crypt = 'static $sbox1, $sbox2, $sbox3, $sbox4, $sbox5, $sbox6, $sbox7, $sbox8, $shuffleip, $shuffleinvip;
                 if (!$sbox1) {
                     $sbox1 = array_map("intval", $self->sbox1);
                     $sbox2 = array_map("intval", $self->sbox2);
@@ -1047,7 +1062,8 @@ class Crypt_DES extends Crypt_Base
 
 			switch (true) {
 				case $gen_hi_opt_code:
-																				$k = array(
+
+					$k = array(
 						CRYPT_DES_ENCRYPT => $this->keys[CRYPT_DES_ENCRYPT],
 						CRYPT_DES_DECRYPT => $this->keys[CRYPT_DES_DECRYPT]
 					);
@@ -1055,7 +1071,8 @@ class Crypt_DES extends Crypt_Base
 					$init_decrypt = '';
 					break;
 				default:
-															$k = array(
+
+					$k = array(
 						CRYPT_DES_ENCRYPT => array(),
 						CRYPT_DES_DECRYPT => array()
 					);
@@ -1068,7 +1085,7 @@ class Crypt_DES extends Crypt_Base
 					break;
 			}
 
-						$crypt_block = array();
+			$crypt_block = array();
 			foreach (array(CRYPT_DES_ENCRYPT, CRYPT_DES_DECRYPT) as $c) {
 
 				$crypt_block[$c] = '
@@ -1093,9 +1110,11 @@ class Crypt_DES extends Crypt_Base
 				$l = '$l';
 				$r = '$r';
 
-								for ($ki = -1, $des_round = 0; $des_round < $des_rounds; ++$des_round) {
-										for ($i = 0; $i < 16; ++$i) {
-																								$crypt_block[$c].= '
+				for ($ki = -1, $des_round = 0; $des_round < $des_rounds; ++$des_round) {
+
+					for ($i = 0; $i < 16; ++$i) {
+
+						$crypt_block[$c].= '
                             $b1 = ((' . $r . ' >>  3) & 0x1FFFFFFF)  ^ (' . $r . ' << 29) ^ ' . $k[$c][++$ki] . ';
                             $b2 = ((' . $r . ' >> 31) & 0x00000001)  ^ (' . $r . ' <<  1) ^ ' . $k[$c][++$ki] . ';' .
 
@@ -1105,12 +1124,12 @@ class Crypt_DES extends Crypt_Base
                                      $sbox7[ $b1        & 0x3F] ^ $sbox8[ $b2        & 0x3F] ^ ' . $l . ';
                         ';
 
-												list($l, $r) = array($r, $l);
+						list($l, $r) = array($r, $l);
 					}
 					list($l, $r) = array($r, $l);
 				}
 
-								$crypt_block[$c].= '$in =
+				$crypt_block[$c].= '$in =
                     ($shuffleinvip[($l >> 24) & 0xFF] & "\x80\x80\x80\x80\x80\x80\x80\x80") |
                     ($shuffleinvip[($r >> 24) & 0xFF] & "\x40\x40\x40\x40\x40\x40\x40\x40") |
                     ($shuffleinvip[($l >> 16) & 0xFF] & "\x20\x20\x20\x20\x20\x20\x20\x20") |
@@ -1122,7 +1141,7 @@ class Crypt_DES extends Crypt_Base
                 ';
 			}
 
-						$lambda_functions[$code_hash] = $this->_createInlineCryptFunction(
+			$lambda_functions[$code_hash] = $this->_createInlineCryptFunction(
 				array(
 					'init_crypt'	=> $init_crypt,
 					'init_encrypt'	=> $init_encrypt,
@@ -1133,6 +1152,6 @@ class Crypt_DES extends Crypt_Base
 			);
 		}
 
-				$this->inline_crypt = $lambda_functions[$code_hash];
+		$this->inline_crypt = $lambda_functions[$code_hash];
 	}
 }}

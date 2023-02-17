@@ -25,6 +25,8 @@ class Crypt_Blowfish extends Crypt_Base
 
 	var $cfb_init_len = 500;
 
+	var $sha512;
+
 	var $sbox0 = array(
 		0xd1310ba6, 0x98dfb5ac, 0x2ffd72db, 0xd01adfb7, 0xb8e1afed, 0x6a267e96, 0xba7c9045, 0xf12c7f99,
 		0x24a19947, 0xb3916cf7, 0x0801f2e2, 0x858efc16, 0x636920d8, 0x71574e69, 0xa458fea3, 0xf4933d7e,
@@ -177,6 +179,17 @@ class Crypt_Blowfish extends Crypt_Base
 
 	var $key_length = 16;
 
+	function __construct($mode = CRYPT_MODE_CBC)
+	{
+		parent::__construct($mode);
+
+		$this->sbox0 = array_map('intval', $this->sbox0);
+		$this->sbox1 = array_map('intval', $this->sbox1);
+		$this->sbox2 = array_map('intval', $this->sbox2);
+		$this->sbox3 = array_map('intval', $this->sbox3);
+		$this->parray = array_map('intval', $this->parray);
+	}
+
 	function setKeyLength($length)
 	{
 		if ($length < 32) {
@@ -193,6 +206,10 @@ class Crypt_Blowfish extends Crypt_Base
 	function isValidEngine($engine)
 	{
 		if ($engine == CRYPT_ENGINE_OPENSSL) {
+
+			if (defined('OPENSSL_VERSION_TEXT') && version_compare(preg_replace('#OpenSSL (\d+\.\d+\.\d+) .*#', '$1', OPENSSL_VERSION_TEXT), '3.0.1', '>=')) {
+				return false;
+			}
 			if (version_compare(PHP_VERSION, '5.3.7') < 0 && $this->key_length != 16) {
 				return false;
 			}
@@ -209,7 +226,8 @@ class Crypt_Blowfish extends Crypt_Base
 	function _setupKey()
 	{
 		if (isset($this->kl['key']) && $this->key === $this->kl['key']) {
-						return;
+
+			return;
 		}
 		$this->kl = array('key' => $this->key);
 
@@ -223,19 +241,21 @@ class Crypt_Blowfish extends Crypt_Base
 			)
 		);
 
-				$key	= array_values(unpack('C*', $this->key));
+		$key	= array_values(unpack('C*', $this->key));
 		$keyl = count($key);
+
 		for ($j = 0, $i = 0; $i < 18; ++$i) {
-						for ($data = 0, $k = 0; $k < 4; ++$k) {
+
+			for ($data = 0, $k = 0; $k < 4; ++$k) {
 				$data = ($data << 8) | $key[$j];
 				if (++$j >= $keyl) {
 					$j = 0;
 				}
 			}
-			$this->bctx['p'][] = $this->parray[$i] ^ $data;
+			$this->bctx['p'][] = $this->parray[$i] ^ intval($data);
 		}
 
-						$data = "\0\0\0\0\0\0\0\0";
+		$data = "\0\0\0\0\0\0\0\0";
 		for ($i = 0; $i < 18; $i += 2) {
 			list($l, $r) = array_values(unpack('N*', $data = $this->_encryptBlock($data)));
 			$this->bctx['p'][$i	] = $l;
@@ -250,10 +270,189 @@ class Crypt_Blowfish extends Crypt_Base
 		}
 	}
 
+	function _bcrypt_hash($sha2pass, $sha2salt)
+	{
+		$p = $this->parray;
+		$sbox0 = $this->sbox0;
+		$sbox1 = $this->sbox1;
+		$sbox2 = $this->sbox2;
+		$sbox3 = $this->sbox3;
+
+		$cdata = array_values(unpack('N*', 'OxychromaticBlowfishSwatDynamite'));
+		$sha2pass = array_values(unpack('N*', $sha2pass));
+		$sha2salt = array_values(unpack('N*', $sha2salt));
+
+		$this->_expandstate($sha2salt, $sha2pass, $sbox0, $sbox1, $sbox2, $sbox3, $p);
+		for ($i = 0; $i < 64; $i++) {
+			$this->_expand0state($sha2salt, $sbox0, $sbox1, $sbox2, $sbox3, $p);
+			$this->_expand0state($sha2pass, $sbox0, $sbox1, $sbox2, $sbox3, $p);
+		}
+
+		for ($i = 0; $i < 64; $i++) {
+			for ($j = 0; $j < 8; $j+= 2) {
+				list($cdata[$j], $cdata[$j + 1]) = $this->_encryptBlockHelperFast($cdata[$j], $cdata[$j + 1], $sbox0, $sbox1, $sbox2, $sbox3, $p);
+			}
+		}
+
+		$output = '';
+		for ($i = 0; $i < count($cdata); $i++) {
+			$output.= pack('L*', $cdata[$i]);
+		}
+		return $output;
+	}
+
+	function bcrypt_pbkdf($pass, $salt, $keylen, $rounds)
+	{
+		if (PHP_INT_SIZE == 4) {
+			user_error('bcrypt is far too slow to be practical on 32-bit versions of PHP');
+			return false;
+		}
+
+		if (!class_exists('Crypt_Hash')) {
+			include_once 'Crypt/Hash.php';
+		}
+
+		if (!isset($this->sha512)) {
+			$this->sha512 = new Crypt_Hash('sha512');
+		}
+
+		$sha2pass = $this->sha512->hash($pass);
+		$results = array();
+		$count = 1;
+		while (32 * count($results) < $keylen) {
+			$countsalt = $salt . pack('N', $count++);
+			$sha2salt = $this->sha512->hash($countsalt);
+			$out = $tmpout = $this->_bcrypt_hash($sha2pass, $sha2salt);
+			for ($i = 1; $i < $rounds; $i++) {
+				$sha2salt = $this->sha512->hash($tmpout);
+				$tmpout = $this->_bcrypt_hash($sha2pass, $sha2salt);
+				$out^= $tmpout;
+			}
+			$results[] = $out;
+		}
+		$output = '';
+		for ($i = 0; $i < 32; $i++) {
+			foreach ($results as $result) {
+				$output.= $result[$i];
+			}
+		}
+		return substr($output, 0, $keylen);
+	}
+
+	function _expand0state($key, &$sbox0, &$sbox1, &$sbox2, &$sbox3, &$p)
+	{
+
+		$p = array(
+			$p[0] ^ $key[0],
+			$p[1] ^ $key[1],
+			$p[2] ^ $key[2],
+			$p[3] ^ $key[3],
+			$p[4] ^ $key[4],
+			$p[5] ^ $key[5],
+			$p[6] ^ $key[6],
+			$p[7] ^ $key[7],
+			$p[8] ^ $key[8],
+			$p[9] ^ $key[9],
+			$p[10] ^ $key[10],
+			$p[11] ^ $key[11],
+			$p[12] ^ $key[12],
+			$p[13] ^ $key[13],
+			$p[14] ^ $key[14],
+			$p[15] ^ $key[15],
+			$p[16] ^ $key[0],
+			$p[17] ^ $key[1]
+		);
+
+		list( $p[0],	$p[1]) = $this->_encryptBlockHelperFast(	 0,		0, $sbox0, $sbox1, $sbox2, $sbox3, $p);
+		list( $p[2],	$p[3]) = $this->_encryptBlockHelperFast($p[ 0], $p[ 1], $sbox0, $sbox1, $sbox2, $sbox3, $p);
+		list( $p[4],	$p[5]) = $this->_encryptBlockHelperFast($p[ 2], $p[ 3], $sbox0, $sbox1, $sbox2, $sbox3, $p);
+		list( $p[6],	$p[7]) = $this->_encryptBlockHelperFast($p[ 4], $p[ 5], $sbox0, $sbox1, $sbox2, $sbox3, $p);
+		list( $p[8],	$p[9]) = $this->_encryptBlockHelperFast($p[ 6], $p[ 7], $sbox0, $sbox1, $sbox2, $sbox3, $p);
+		list($p[10], $p[11]) = $this->_encryptBlockHelperFast($p[ 8], $p[ 9], $sbox0, $sbox1, $sbox2, $sbox3, $p);
+		list($p[12], $p[13]) = $this->_encryptBlockHelperFast($p[10], $p[11], $sbox0, $sbox1, $sbox2, $sbox3, $p);
+		list($p[14], $p[15]) = $this->_encryptBlockHelperFast($p[12], $p[13], $sbox0, $sbox1, $sbox2, $sbox3, $p);
+		list($p[16], $p[17]) = $this->_encryptBlockHelperFast($p[14], $p[15], $sbox0, $sbox1, $sbox2, $sbox3, $p);
+
+		list($sbox0[0], $sbox0[1]) = $this->_encryptBlockHelperFast($p[16], $p[17], $sbox0, $sbox1, $sbox2, $sbox3, $p);
+		for ($i = 2; $i < 256; $i+= 2) {
+			list($sbox0[$i], $sbox0[$i + 1]) = $this->_encryptBlockHelperFast($sbox0[$i - 2], $sbox0[$i - 1], $sbox0, $sbox1, $sbox2, $sbox3, $p);
+		}
+
+		list($sbox1[0], $sbox1[1]) = $this->_encryptBlockHelperFast($sbox0[254], $sbox0[255], $sbox0, $sbox1, $sbox2, $sbox3, $p);
+		for ($i = 2; $i < 256; $i+= 2) {
+			list($sbox1[$i], $sbox1[$i + 1]) = $this->_encryptBlockHelperFast($sbox1[$i - 2], $sbox1[$i - 1], $sbox0, $sbox1, $sbox2, $sbox3, $p);
+		}
+
+		list($sbox2[0], $sbox2[1]) = $this->_encryptBlockHelperFast($sbox1[254], $sbox1[255], $sbox0, $sbox1, $sbox2, $sbox3, $p);
+		for ($i = 2; $i < 256; $i+= 2) {
+			list($sbox2[$i], $sbox2[$i + 1]) = $this->_encryptBlockHelperFast($sbox2[$i - 2], $sbox2[$i - 1], $sbox0, $sbox1, $sbox2, $sbox3, $p);
+		}
+
+		list($sbox3[0], $sbox3[1]) = $this->_encryptBlockHelperFast($sbox2[254], $sbox2[255], $sbox0, $sbox1, $sbox2, $sbox3, $p);
+		for ($i = 2; $i < 256; $i+= 2) {
+			list($sbox3[$i], $sbox3[$i + 1]) = $this->_encryptBlockHelperFast($sbox3[$i - 2], $sbox3[$i - 1], $sbox0, $sbox1, $sbox2, $sbox3, $p);
+		}
+	}
+
+	function _expandstate($data, $key, &$sbox0, &$sbox1, &$sbox2, &$sbox3, &$p)
+	{
+		$p = array(
+			$p[0] ^ $key[0],
+			$p[1] ^ $key[1],
+			$p[2] ^ $key[2],
+			$p[3] ^ $key[3],
+			$p[4] ^ $key[4],
+			$p[5] ^ $key[5],
+			$p[6] ^ $key[6],
+			$p[7] ^ $key[7],
+			$p[8] ^ $key[8],
+			$p[9] ^ $key[9],
+			$p[10] ^ $key[10],
+			$p[11] ^ $key[11],
+			$p[12] ^ $key[12],
+			$p[13] ^ $key[13],
+			$p[14] ^ $key[14],
+			$p[15] ^ $key[15],
+			$p[16] ^ $key[0],
+			$p[17] ^ $key[1]
+		);
+
+		list( $p[0],	$p[1]) = $this->_encryptBlockHelperFast($data[ 0]		 , $data[ 1]		 , $sbox0, $sbox1, $sbox2, $sbox3, $p);
+		list( $p[2],	$p[3]) = $this->_encryptBlockHelperFast($data[ 2] ^ $p[ 0], $data[ 3] ^ $p[ 1], $sbox0, $sbox1, $sbox2, $sbox3, $p);
+		list( $p[4],	$p[5]) = $this->_encryptBlockHelperFast($data[ 4] ^ $p[ 2], $data[ 5] ^ $p[ 3], $sbox0, $sbox1, $sbox2, $sbox3, $p);
+		list( $p[6],	$p[7]) = $this->_encryptBlockHelperFast($data[ 6] ^ $p[ 4], $data[ 7] ^ $p[ 5], $sbox0, $sbox1, $sbox2, $sbox3, $p);
+		list( $p[8],	$p[9]) = $this->_encryptBlockHelperFast($data[ 8] ^ $p[ 6], $data[ 9] ^ $p[ 7], $sbox0, $sbox1, $sbox2, $sbox3, $p);
+		list($p[10], $p[11]) = $this->_encryptBlockHelperFast($data[10] ^ $p[ 8], $data[11] ^ $p[ 9], $sbox0, $sbox1, $sbox2, $sbox3, $p);
+		list($p[12], $p[13]) = $this->_encryptBlockHelperFast($data[12] ^ $p[10], $data[13] ^ $p[11], $sbox0, $sbox1, $sbox2, $sbox3, $p);
+		list($p[14], $p[15]) = $this->_encryptBlockHelperFast($data[14] ^ $p[12], $data[15] ^ $p[13], $sbox0, $sbox1, $sbox2, $sbox3, $p);
+		list($p[16], $p[17]) = $this->_encryptBlockHelperFast($data[ 0] ^ $p[14], $data[ 1] ^ $p[15], $sbox0, $sbox1, $sbox2, $sbox3, $p);
+
+		list($sbox0[0], $sbox0[1]) = $this->_encryptBlockHelperFast($data[2] ^ $p[16], $data[3] ^ $p[17], $sbox0, $sbox1, $sbox2, $sbox3, $p);
+		for ($i = 2, $j = 4; $i < 256; $i+= 2, $j = ($j + 2) % 16) {
+			list($sbox0[$i], $sbox0[$i + 1]) = $this->_encryptBlockHelperFast($data[$j] ^ $sbox0[$i - 2], $data[$j + 1] ^ $sbox0[$i - 1], $sbox0, $sbox1, $sbox2, $sbox3, $p);
+		}
+
+		list($sbox1[0], $sbox1[1]) = $this->_encryptBlockHelperFast($data[2] ^ $sbox0[254], $data[3] ^ $sbox0[255], $sbox0, $sbox1, $sbox2, $sbox3, $p);
+		for ($i = 2, $j = 4; $i < 256; $i+= 2, $j = ($j + 2) % 16) {
+			list($sbox1[$i], $sbox1[$i + 1]) = $this->_encryptBlockHelperFast($data[$j] ^ $sbox1[$i - 2], $data[$j + 1] ^ $sbox1[$i - 1], $sbox0, $sbox1, $sbox2, $sbox3, $p);
+		}
+
+		list($sbox2[0], $sbox2[1]) = $this->_encryptBlockHelperFast($data[2] ^ $sbox1[254], $data[3] ^ $sbox1[255], $sbox0, $sbox1, $sbox2, $sbox3, $p);
+		for ($i = 2, $j = 4; $i < 256; $i+= 2, $j = ($j + 2) % 16) {
+			list($sbox2[$i], $sbox2[$i + 1]) = $this->_encryptBlockHelperFast($data[$j] ^ $sbox2[$i - 2], $data[$j + 1] ^ $sbox2[$i - 1], $sbox0, $sbox1, $sbox2, $sbox3, $p);
+		}
+
+		list($sbox3[0], $sbox3[1]) = $this->_encryptBlockHelperFast($data[2] ^ $sbox2[254], $data[3] ^ $sbox2[255], $sbox0, $sbox1, $sbox2, $sbox3, $p);
+		for ($i = 2, $j = 4; $i < 256; $i+= 2, $j = ($j + 2) % 16) {
+			list($sbox3[$i], $sbox3[$i + 1]) = $this->_encryptBlockHelperFast($data[$j] ^ $sbox3[$i - 2], $data[$j + 1] ^ $sbox3[$i - 1], $sbox0, $sbox1, $sbox2, $sbox3, $p);
+		}
+	}
+
 	function _encryptBlock($in)
 	{
 		$p = $this->bctx["p"];
-				$sb_0 = $this->bctx["sb"][0];
+
+		$sb_0 = $this->bctx["sb"][0];
 		$sb_1 = $this->bctx["sb"][1];
 		$sb_2 = $this->bctx["sb"][2];
 		$sb_3 = $this->bctx["sb"][3];
@@ -262,18 +461,84 @@ class Crypt_Blowfish extends Crypt_Base
 		$l = $in[1];
 		$r = $in[2];
 
-		for ($i = 0; $i < 16; $i+= 2) {
-			$l^= $p[$i];
-			$r^= $this->safe_intval(($this->safe_intval($sb_0[$l >> 24 & 0xff]	+ $sb_1[$l >> 16 & 0xff]) ^
-					$sb_2[$l >>	8 & 0xff]) +
-					$sb_3[$l		& 0xff]);
-
-			$r^= $p[$i + 1];
-			$l^= $this->safe_intval(($this->safe_intval($sb_0[$r >> 24 & 0xff]	+ $sb_1[$r >> 16 & 0xff]) ^
-					$sb_2[$r >>	8 & 0xff]) +
-					$sb_3[$r		& 0xff]);
+		if (CRYPT_BASE_USE_REG_INTVAL) {
+			list($r, $l) = PHP_INT_SIZE === 8 ?
+				$this->_encryptBlockHelperFast($l, $r, $sb_0, $sb_1, $sb_2, $sb_3, $p) :
+				$this->_encryptBlockHelperFast32($l, $r, $sb_0, $sb_1, $sb_2, $sb_3, $p);
+		} else {
+			list($r, $l) = $this->_encryptBlockHelperSlow($l, $r, $sb_0, $sb_1, $sb_2, $sb_3, $p);
 		}
-		return pack("N*", $r ^ $p[17], $l ^ $p[16]);
+
+		return pack("N*", $r, $l);
+	}
+
+	function _encryptBlockHelperFast($x0, $x1, $sbox0, $sbox1, $sbox2, $sbox3, $p)
+	{
+		$x0 ^= $p[0];
+		$x1 ^= ((($sbox0[($x0 & 0xFF000000) >> 24] + $sbox1[($x0 & 0xFF0000) >> 16]) ^ $sbox2[($x0 & 0xFF00) >> 8]) + $sbox3[$x0 & 0xFF]) ^ $p[1];
+		$x0 ^= ((($sbox0[($x1 & 0xFF000000) >> 24] + $sbox1[($x1 & 0xFF0000) >> 16]) ^ $sbox2[($x1 & 0xFF00) >> 8]) + $sbox3[$x1 & 0xFF]) ^ $p[2];
+		$x1 ^= ((($sbox0[($x0 & 0xFF000000) >> 24] + $sbox1[($x0 & 0xFF0000) >> 16]) ^ $sbox2[($x0 & 0xFF00) >> 8]) + $sbox3[$x0 & 0xFF]) ^ $p[3];
+		$x0 ^= ((($sbox0[($x1 & 0xFF000000) >> 24] + $sbox1[($x1 & 0xFF0000) >> 16]) ^ $sbox2[($x1 & 0xFF00) >> 8]) + $sbox3[$x1 & 0xFF]) ^ $p[4];
+		$x1 ^= ((($sbox0[($x0 & 0xFF000000) >> 24] + $sbox1[($x0 & 0xFF0000) >> 16]) ^ $sbox2[($x0 & 0xFF00) >> 8]) + $sbox3[$x0 & 0xFF]) ^ $p[5];
+		$x0 ^= ((($sbox0[($x1 & 0xFF000000) >> 24] + $sbox1[($x1 & 0xFF0000) >> 16]) ^ $sbox2[($x1 & 0xFF00) >> 8]) + $sbox3[$x1 & 0xFF]) ^ $p[6];
+		$x1 ^= ((($sbox0[($x0 & 0xFF000000) >> 24] + $sbox1[($x0 & 0xFF0000) >> 16]) ^ $sbox2[($x0 & 0xFF00) >> 8]) + $sbox3[$x0 & 0xFF]) ^ $p[7];
+		$x0 ^= ((($sbox0[($x1 & 0xFF000000) >> 24] + $sbox1[($x1 & 0xFF0000) >> 16]) ^ $sbox2[($x1 & 0xFF00) >> 8]) + $sbox3[$x1 & 0xFF]) ^ $p[8];
+		$x1 ^= ((($sbox0[($x0 & 0xFF000000) >> 24] + $sbox1[($x0 & 0xFF0000) >> 16]) ^ $sbox2[($x0 & 0xFF00) >> 8]) + $sbox3[$x0 & 0xFF]) ^ $p[9];
+		$x0 ^= ((($sbox0[($x1 & 0xFF000000) >> 24] + $sbox1[($x1 & 0xFF0000) >> 16]) ^ $sbox2[($x1 & 0xFF00) >> 8]) + $sbox3[$x1 & 0xFF]) ^ $p[10];
+		$x1 ^= ((($sbox0[($x0 & 0xFF000000) >> 24] + $sbox1[($x0 & 0xFF0000) >> 16]) ^ $sbox2[($x0 & 0xFF00) >> 8]) + $sbox3[$x0 & 0xFF]) ^ $p[11];
+		$x0 ^= ((($sbox0[($x1 & 0xFF000000) >> 24] + $sbox1[($x1 & 0xFF0000) >> 16]) ^ $sbox2[($x1 & 0xFF00) >> 8]) + $sbox3[$x1 & 0xFF]) ^ $p[12];
+		$x1 ^= ((($sbox0[($x0 & 0xFF000000) >> 24] + $sbox1[($x0 & 0xFF0000) >> 16]) ^ $sbox2[($x0 & 0xFF00) >> 8]) + $sbox3[$x0 & 0xFF]) ^ $p[13];
+		$x0 ^= ((($sbox0[($x1 & 0xFF000000) >> 24] + $sbox1[($x1 & 0xFF0000) >> 16]) ^ $sbox2[($x1 & 0xFF00) >> 8]) + $sbox3[$x1 & 0xFF]) ^ $p[14];
+		$x1 ^= ((($sbox0[($x0 & 0xFF000000) >> 24] + $sbox1[($x0 & 0xFF0000) >> 16]) ^ $sbox2[($x0 & 0xFF00) >> 8]) + $sbox3[$x0 & 0xFF]) ^ $p[15];
+		$x0 ^= ((($sbox0[($x1 & 0xFF000000) >> 24] + $sbox1[($x1 & 0xFF0000) >> 16]) ^ $sbox2[($x1 & 0xFF00) >> 8]) + $sbox3[$x1 & 0xFF]) ^ $p[16];
+
+		return array($x1 & 0xFFFFFFFF ^ $p[17], $x0 & 0xFFFFFFFF);
+	}
+
+	function _encryptBlockHelperFast32($x0, $x1, $sbox0, $sbox1, $sbox2, $sbox3, $p)
+	{
+		$x0 ^= $p[0];
+		$x1 ^= ((($sbox0[(($x0 & 0xFF000000) >> 24) & 0xFF] + $sbox1[($x0 & 0xFF0000) >> 16]) ^ $sbox2[($x0 & 0xFF00) >> 8]) + $sbox3[$x0 & 0xFF]) ^ $p[1];
+		$x0 ^= ((($sbox0[(($x1 & 0xFF000000) >> 24) & 0xFF] + $sbox1[($x1 & 0xFF0000) >> 16]) ^ $sbox2[($x1 & 0xFF00) >> 8]) + $sbox3[$x1 & 0xFF]) ^ $p[2];
+		$x1 ^= ((($sbox0[(($x0 & 0xFF000000) >> 24) & 0xFF] + $sbox1[($x0 & 0xFF0000) >> 16]) ^ $sbox2[($x0 & 0xFF00) >> 8]) + $sbox3[$x0 & 0xFF]) ^ $p[3];
+		$x0 ^= ((($sbox0[(($x1 & 0xFF000000) >> 24) & 0xFF] + $sbox1[($x1 & 0xFF0000) >> 16]) ^ $sbox2[($x1 & 0xFF00) >> 8]) + $sbox3[$x1 & 0xFF]) ^ $p[4];
+		$x1 ^= ((($sbox0[(($x0 & 0xFF000000) >> 24) & 0xFF] + $sbox1[($x0 & 0xFF0000) >> 16]) ^ $sbox2[($x0 & 0xFF00) >> 8]) + $sbox3[$x0 & 0xFF]) ^ $p[5];
+		$x0 ^= ((($sbox0[(($x1 & 0xFF000000) >> 24) & 0xFF] + $sbox1[($x1 & 0xFF0000) >> 16]) ^ $sbox2[($x1 & 0xFF00) >> 8]) + $sbox3[$x1 & 0xFF]) ^ $p[6];
+		$x1 ^= ((($sbox0[(($x0 & 0xFF000000) >> 24) & 0xFF] + $sbox1[($x0 & 0xFF0000) >> 16]) ^ $sbox2[($x0 & 0xFF00) >> 8]) + $sbox3[$x0 & 0xFF]) ^ $p[7];
+		$x0 ^= ((($sbox0[(($x1 & 0xFF000000) >> 24) & 0xFF] + $sbox1[($x1 & 0xFF0000) >> 16]) ^ $sbox2[($x1 & 0xFF00) >> 8]) + $sbox3[$x1 & 0xFF]) ^ $p[8];
+		$x1 ^= ((($sbox0[(($x0 & 0xFF000000) >> 24) & 0xFF] + $sbox1[($x0 & 0xFF0000) >> 16]) ^ $sbox2[($x0 & 0xFF00) >> 8]) + $sbox3[$x0 & 0xFF]) ^ $p[9];
+		$x0 ^= ((($sbox0[(($x1 & 0xFF000000) >> 24) & 0xFF] + $sbox1[($x1 & 0xFF0000) >> 16]) ^ $sbox2[($x1 & 0xFF00) >> 8]) + $sbox3[$x1 & 0xFF]) ^ $p[10];
+		$x1 ^= ((($sbox0[(($x0 & 0xFF000000) >> 24) & 0xFF] + $sbox1[($x0 & 0xFF0000) >> 16]) ^ $sbox2[($x0 & 0xFF00) >> 8]) + $sbox3[$x0 & 0xFF]) ^ $p[11];
+		$x0 ^= ((($sbox0[(($x1 & 0xFF000000) >> 24) & 0xFF] + $sbox1[($x1 & 0xFF0000) >> 16]) ^ $sbox2[($x1 & 0xFF00) >> 8]) + $sbox3[$x1 & 0xFF]) ^ $p[12];
+		$x1 ^= ((($sbox0[(($x0 & 0xFF000000) >> 24) & 0xFF] + $sbox1[($x0 & 0xFF0000) >> 16]) ^ $sbox2[($x0 & 0xFF00) >> 8]) + $sbox3[$x0 & 0xFF]) ^ $p[13];
+		$x0 ^= ((($sbox0[(($x1 & 0xFF000000) >> 24) & 0xFF] + $sbox1[($x1 & 0xFF0000) >> 16]) ^ $sbox2[($x1 & 0xFF00) >> 8]) + $sbox3[$x1 & 0xFF]) ^ $p[14];
+		$x1 ^= ((($sbox0[(($x0 & 0xFF000000) >> 24) & 0xFF] + $sbox1[($x0 & 0xFF0000) >> 16]) ^ $sbox2[($x0 & 0xFF00) >> 8]) + $sbox3[$x0 & 0xFF]) ^ $p[15];
+		$x0 ^= ((($sbox0[(($x1 & 0xFF000000) >> 24) & 0xFF] + $sbox1[($x1 & 0xFF0000) >> 16]) ^ $sbox2[($x1 & 0xFF00) >> 8]) + $sbox3[$x1 & 0xFF]) ^ $p[16];
+
+		return array($x1 & 0xFFFFFFFF ^ $p[17], $x0 & 0xFFFFFFFF);
+	}
+
+	function _encryptBlockHelperSlow($x0, $x1, $sbox0, $sbox1, $sbox2, $sbox3, $p)
+	{
+		$x0^= $p[0];
+		$x1^= $this->safe_intval(($this->safe_intval($sbox0[(($x0 & 0xFF000000) >> 24) & 0xFF] + $sbox1[($x0 & 0xFF0000) >> 16]) ^ $sbox2[($x0 & 0xFF00) >> 8]) + $sbox3[$x0 & 0xFF]) ^ $p[1];
+		$x0^= $this->safe_intval(($this->safe_intval($sbox0[(($x1 & 0xFF000000) >> 24) & 0xFF] + $sbox1[($x1 & 0xFF0000) >> 16]) ^ $sbox2[($x1 & 0xFF00) >> 8]) + $sbox3[$x1 & 0xFF]) ^ $p[2];
+		$x1^= $this->safe_intval(($this->safe_intval($sbox0[(($x0 & 0xFF000000) >> 24) & 0xFF] + $sbox1[($x0 & 0xFF0000) >> 16]) ^ $sbox2[($x0 & 0xFF00) >> 8]) + $sbox3[$x0 & 0xFF]) ^ $p[3];
+		$x0^= $this->safe_intval(($this->safe_intval($sbox0[(($x1 & 0xFF000000) >> 24) & 0xFF] + $sbox1[($x1 & 0xFF0000) >> 16]) ^ $sbox2[($x1 & 0xFF00) >> 8]) + $sbox3[$x1 & 0xFF]) ^ $p[4];
+		$x1^= $this->safe_intval(($this->safe_intval($sbox0[(($x0 & 0xFF000000) >> 24) & 0xFF] + $sbox1[($x0 & 0xFF0000) >> 16]) ^ $sbox2[($x0 & 0xFF00) >> 8]) + $sbox3[$x0 & 0xFF]) ^ $p[5];
+		$x0^= $this->safe_intval(($this->safe_intval($sbox0[(($x1 & 0xFF000000) >> 24) & 0xFF] + $sbox1[($x1 & 0xFF0000) >> 16]) ^ $sbox2[($x1 & 0xFF00) >> 8]) + $sbox3[$x1 & 0xFF]) ^ $p[6];
+		$x1^= $this->safe_intval(($this->safe_intval($sbox0[(($x0 & 0xFF000000) >> 24) & 0xFF] + $sbox1[($x0 & 0xFF0000) >> 16]) ^ $sbox2[($x0 & 0xFF00) >> 8]) + $sbox3[$x0 & 0xFF]) ^ $p[7];
+		$x0^= $this->safe_intval(($this->safe_intval($sbox0[(($x1 & 0xFF000000) >> 24) & 0xFF] + $sbox1[($x1 & 0xFF0000) >> 16]) ^ $sbox2[($x1 & 0xFF00) >> 8]) + $sbox3[$x1 & 0xFF]) ^ $p[8];
+		$x1^= $this->safe_intval(($this->safe_intval($sbox0[(($x0 & 0xFF000000) >> 24) & 0xFF] + $sbox1[($x0 & 0xFF0000) >> 16]) ^ $sbox2[($x0 & 0xFF00) >> 8]) + $sbox3[$x0 & 0xFF]) ^ $p[9];
+		$x0^= $this->safe_intval(($this->safe_intval($sbox0[(($x1 & 0xFF000000) >> 24) & 0xFF] + $sbox1[($x1 & 0xFF0000) >> 16]) ^ $sbox2[($x1 & 0xFF00) >> 8]) + $sbox3[$x1 & 0xFF]) ^ $p[10];
+		$x1^= $this->safe_intval(($this->safe_intval($sbox0[(($x0 & 0xFF000000) >> 24) & 0xFF] + $sbox1[($x0 & 0xFF0000) >> 16]) ^ $sbox2[($x0 & 0xFF00) >> 8]) + $sbox3[$x0 & 0xFF]) ^ $p[11];
+		$x0^= $this->safe_intval(($this->safe_intval($sbox0[(($x1 & 0xFF000000) >> 24) & 0xFF] + $sbox1[($x1 & 0xFF0000) >> 16]) ^ $sbox2[($x1 & 0xFF00) >> 8]) + $sbox3[$x1 & 0xFF]) ^ $p[12];
+		$x1^= $this->safe_intval(($this->safe_intval($sbox0[(($x0 & 0xFF000000) >> 24) & 0xFF] + $sbox1[($x0 & 0xFF0000) >> 16]) ^ $sbox2[($x0 & 0xFF00) >> 8]) + $sbox3[$x0 & 0xFF]) ^ $p[13];
+		$x0^= $this->safe_intval(($this->safe_intval($sbox0[(($x1 & 0xFF000000) >> 24) & 0xFF] + $sbox1[($x1 & 0xFF0000) >> 16]) ^ $sbox2[($x1 & 0xFF00) >> 8]) + $sbox3[$x1 & 0xFF]) ^ $p[14];
+		$x1^= $this->safe_intval(($this->safe_intval($sbox0[(($x0 & 0xFF000000) >> 24) & 0xFF] + $sbox1[($x0 & 0xFF0000) >> 16]) ^ $sbox2[($x0 & 0xFF00) >> 8]) + $sbox3[$x0 & 0xFF]) ^ $p[15];
+		$x0^= $this->safe_intval(($this->safe_intval($sbox0[(($x1 & 0xFF000000) >> 24) & 0xFF] + $sbox1[($x1 & 0xFF0000) >> 16]) ^ $sbox2[($x1 & 0xFF00) >> 8]) + $sbox3[$x1 & 0xFF]) ^ $p[16];
+
+		return array($x1 & 0xFFFFFFFF ^ $p[17], $x0 & 0xFFFFFFFF);
 	}
 
 	function _decryptBlock($in)
@@ -306,9 +571,9 @@ class Crypt_Blowfish extends Crypt_Base
 	{
 		$lambda_functions =& Crypt_Blowfish::_getLambdaFunctions();
 
-								$gen_hi_opt_code = (bool)(count($lambda_functions) < 10);
+		$gen_hi_opt_code = (bool)(count($lambda_functions) < 10);
 
-				$code_hash = "Crypt_Blowfish, {$this->mode}";
+		$code_hash = "Crypt_Blowfish, {$this->mode}";
 		if ($gen_hi_opt_code) {
 			$code_hash = str_pad($code_hash, 32) . $this->_hashInlineCryptFunction($this->key);
 		}
@@ -341,7 +606,7 @@ class Crypt_Blowfish extends Crypt_Base
                     ';
 			}
 
-						$encrypt_block = '
+			$encrypt_block = '
                 $in = unpack("N*", $in);
                 $l = $in[1];
                 $r = $in[2];
@@ -366,7 +631,7 @@ class Crypt_Blowfish extends Crypt_Base
                 );
             ';
 
-						$decrypt_block = '
+			$decrypt_block = '
                 $in = unpack("N*", $in);
                 $l = $in[1];
                 $r = $in[2];

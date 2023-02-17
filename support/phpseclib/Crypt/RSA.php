@@ -42,6 +42,8 @@ define('CRYPT_RSA_PRIVATE_FORMAT_XML', 2);
 
 define('CRYPT_RSA_PRIVATE_FORMAT_PKCS8', 8);
 
+define('CRYPT_RSA_PRIVATE_FORMAT_OPENSSH', 9);
+
 define('CRYPT_RSA_PUBLIC_FORMAT_RAW', 3);
 
 define('CRYPT_RSA_PUBLIC_FORMAT_PKCS1', 4);
@@ -114,14 +116,17 @@ class Crypt_RSA
 
 		if (!defined('CRYPT_RSA_MODE')) {
 			switch (true) {
-																case defined('MATH_BIGINTEGER_OPENSSL_DISABLE'):
+
+				case defined('MATH_BIGINTEGER_OPENSSL_DISABLE'):
 					define('CRYPT_RSA_MODE', CRYPT_RSA_MODE_INTERNAL);
 					break;
-								case !function_exists('openssl_pkey_get_details'):
+
+				case !function_exists('openssl_pkey_get_details'):
 					define('CRYPT_RSA_MODE', CRYPT_RSA_MODE_INTERNAL);
 					break;
-				case extension_loaded('openssl') && version_compare(PHP_VERSION, '4.2.0', '>=') && file_exists($this->configFile):
-										ob_start();
+				case function_exists('phpinfo') && extension_loaded('openssl') && version_compare(PHP_VERSION, '4.2.0', '>=') && file_exists($this->configFile):
+
+					ob_start();
 					@phpinfo();
 					$content = ob_get_contents();
 					ob_end_clean();
@@ -133,7 +138,7 @@ class Crypt_RSA
 						for ($i = 0; $i < count($matches[1]); $i++) {
 							$fullVersion = trim(str_replace('=>', '', strip_tags($matches[2][$i])));
 
-														if (!preg_match('/(\d+\.\d+\.\d+)/i', $fullVersion, $m)) {
+							if (!preg_match('/(\d+\.\d+\.\d+)/i', $fullVersion, $m)) {
 								$versions[$matches[1][$i]] = $fullVersion;
 							} else {
 								$versions[$matches[1][$i]] = $m[0];
@@ -141,7 +146,7 @@ class Crypt_RSA
 						}
 					}
 
-										switch (true) {
+					switch (true) {
 						case !isset($versions['Header']):
 						case !isset($versions['Library']):
 						case $versions['Header'] == $versions['Library']:
@@ -176,13 +181,15 @@ class Crypt_RSA
 	function createKey($bits = 1024, $timeout = false, $partial = array())
 	{
 		if (!defined('CRYPT_RSA_EXPONENT')) {
-						define('CRYPT_RSA_EXPONENT', '65537');
+
+			define('CRYPT_RSA_EXPONENT', '65537');
 		}
-														if (!defined('CRYPT_RSA_SMALLEST_PRIME')) {
+
+		if (!defined('CRYPT_RSA_SMALLEST_PRIME')) {
 			define('CRYPT_RSA_SMALLEST_PRIME', 4096);
 		}
 
-				if (CRYPT_RSA_MODE == CRYPT_RSA_MODE_OPENSSL && $bits >= 384 && CRYPT_RSA_EXPONENT == 65537) {
+		if (CRYPT_RSA_MODE == CRYPT_RSA_MODE_OPENSSL && $bits >= 384 && CRYPT_RSA_EXPONENT == 65537) {
 			$config = array();
 			if (isset($this->configFile)) {
 				$config['config'] = $this->configFile;
@@ -195,7 +202,7 @@ class Crypt_RSA
 			$privatekey = call_user_func_array(array($this, '_convertPrivateKey'), array_values($this->_parseKey($privatekey, CRYPT_RSA_PRIVATE_FORMAT_PKCS1)));
 			$publickey = call_user_func_array(array($this, '_convertPublicKey'), array_values($this->_parseKey($publickey, CRYPT_RSA_PUBLIC_FORMAT_PKCS1)));
 
-						while (openssl_error_string() !== false) {
+			while (openssl_error_string() !== false) {
 			}
 
 			return array(
@@ -212,7 +219,8 @@ class Crypt_RSA
 
 		extract($this->_generateMinMax($bits));
 		$absoluteMin = $min;
-		$temp = $bits >> 1; 		if ($temp > CRYPT_RSA_SMALLEST_PRIME) {
+		$temp = $bits >> 1;
+		if ($temp > CRYPT_RSA_SMALLEST_PRIME) {
 			$num_primes = floor($bits / CRYPT_RSA_SMALLEST_PRIME);
 			$temp = CRYPT_RSA_SMALLEST_PRIME;
 		} else {
@@ -260,13 +268,15 @@ class Crypt_RSA
 				if ($i == $num_primes) {
 					list($min, $temp) = $absoluteMin->divide($n);
 					if (!$temp->equals($this->zero)) {
-						$min = $min->add($this->one); 					}
+						$min = $min->add($this->one);
+					}
 					$primes[$i] = $generator->randomPrime($min, $finalMax, $timeout);
 				} else {
 					$primes[$i] = $generator->randomPrime($min, $max, $timeout);
 				}
 
-				if ($primes[$i] === false) { 					if (count($primes) > 1) {
+				if ($primes[$i] === false) {
+					if (count($primes) > 1) {
 						$partialkey = '';
 					} else {
 						array_pop($primes);
@@ -285,7 +295,7 @@ class Crypt_RSA
 					);
 				}
 
-												if ($i > 2) {
+				if ($i > 2) {
 					$coefficients[$i] = $n->modInverse($primes[$i]);
 				}
 
@@ -293,7 +303,7 @@ class Crypt_RSA
 
 				$temp = $primes[$i]->subtract($this->one);
 
-												$lcm['top'] = $lcm['top']->multiply($temp);
+				$lcm['top'] = $lcm['top']->multiply($temp);
 				$lcm['bottom'] = $lcm['bottom'] === false ? $temp : $lcm['bottom']->gcd($temp);
 
 				$exponents[$i] = $e->modInverse($temp);
@@ -320,7 +330,8 @@ class Crypt_RSA
 		$signed = $this->privateKeyFormat != CRYPT_RSA_PRIVATE_FORMAT_XML;
 		$num_primes = count($primes);
 		$raw = array(
-			'version' => $num_primes == 2 ? chr(0) : chr(1), 			'modulus' => $n->toBytes($signed),
+			'version' => $num_primes == 2 ? chr(0) : chr(1),
+			'modulus' => $n->toBytes($signed),
 			'publicExponent' => $e->toBytes($signed),
 			'privateExponent' => $d->toBytes($signed),
 			'prime1' => $primes[1]->toBytes($signed),
@@ -330,7 +341,7 @@ class Crypt_RSA
 			'coefficient' => $coefficients[2]->toBytes($signed)
 		);
 
-						switch ($this->privateKeyFormat) {
+		switch ($this->privateKeyFormat) {
 			case CRYPT_RSA_PRIVATE_FORMAT_XML:
 				if ($num_primes != 2) {
 					return false;
@@ -423,7 +434,60 @@ class Crypt_RSA
 				$key.= 'Private-MAC: ' . bin2hex($hash->hash($source)) . "\r\n";
 
 				return $key;
-			default: 				$components = array();
+			case CRYPT_RSA_PRIVATE_FORMAT_OPENSSH:
+				if ($num_primes != 2) {
+					return false;
+				}
+				$publicKey = pack('Na*Na*Na*', strlen('ssh-rsa'), 'ssh-rsa', strlen($raw['publicExponent']), $raw['publicExponent'], strlen($raw['modulus']), $raw['modulus']);
+				$privateKey = pack(
+					'Na*Na*Na*Na*Na*Na*Na*',
+					strlen('ssh-rsa'),
+					'ssh-rsa',
+					strlen($raw['modulus']),
+					$raw['modulus'],
+					strlen($raw['publicExponent']),
+					$raw['publicExponent'],
+					strlen($raw['privateExponent']),
+					$raw['privateExponent'],
+					strlen($raw['coefficient']),
+					$raw['coefficient'],
+					strlen($raw['prime1']),
+					$raw['prime1'],
+					strlen($raw['prime2']),
+					$raw['prime2']
+				);
+				$checkint = crypt_random_string(4);
+				$paddedKey = pack(
+					'a*Na*',
+					$checkint . $checkint . $privateKey,
+					strlen($this->comment),
+					$this->comment
+				);
+				$paddingLength = (7 * strlen($paddedKey)) % 8;
+				for ($i = 1; $i <= $paddingLength; $i++) {
+					$paddedKey.= chr($i);
+				}
+				$key = pack(
+					'Na*Na*Na*NNa*Na*',
+					strlen('none'),
+					'none',
+					strlen('none'),
+					'none',
+					0,
+					'',
+					1,
+					strlen($publicKey),
+					$publicKey,
+					strlen($paddedKey),
+					$paddedKey
+				);
+				$key = "openssh-key-v1\0$key";
+
+				return "-----BEGIN OPENSSH PRIVATE KEY-----\n" .
+						chunk_split(base64_encode($key), 70, "\n") .
+						"-----END OPENSSH PRIVATE KEY-----\n";
+			default:
+				$components = array();
 				foreach ($raw as $name => $value) {
 					$components[$name] = pack('Ca*a*', CRYPT_RSA_ASN1_INTEGER, $this->_encodeLength(strlen($value)), $value);
 				}
@@ -433,7 +497,8 @@ class Crypt_RSA
 				if ($num_primes > 2) {
 					$OtherPrimeInfos = '';
 					for ($i = 3; $i <= $num_primes; $i++) {
-																																																$OtherPrimeInfo = pack('Ca*a*', CRYPT_RSA_ASN1_INTEGER, $this->_encodeLength(strlen($primes[$i]->toBytes(true))), $primes[$i]->toBytes(true));
+
+						$OtherPrimeInfo = pack('Ca*a*', CRYPT_RSA_ASN1_INTEGER, $this->_encodeLength(strlen($primes[$i]->toBytes(true))), $primes[$i]->toBytes(true));
 						$OtherPrimeInfo.= pack('Ca*a*', CRYPT_RSA_ASN1_INTEGER, $this->_encodeLength(strlen($exponents[$i]->toBytes(true))), $exponents[$i]->toBytes(true));
 						$OtherPrimeInfo.= pack('Ca*a*', CRYPT_RSA_ASN1_INTEGER, $this->_encodeLength(strlen($coefficients[$i]->toBytes(true))), $coefficients[$i]->toBytes(true));
 						$OtherPrimeInfos.= pack('Ca*a*', CRYPT_RSA_ASN1_SEQUENCE, $this->_encodeLength(strlen($OtherPrimeInfo)), $OtherPrimeInfo);
@@ -444,7 +509,8 @@ class Crypt_RSA
 				$RSAPrivateKey = pack('Ca*a*', CRYPT_RSA_ASN1_SEQUENCE, $this->_encodeLength(strlen($RSAPrivateKey)), $RSAPrivateKey);
 
 				if ($this->privateKeyFormat == CRYPT_RSA_PRIVATE_FORMAT_PKCS8) {
-					$rsaOID = pack('H*', '300d06092a864886f70d0101010500'); 					$RSAPrivateKey = pack(
+					$rsaOID = pack('H*', '300d06092a864886f70d0101010500');
+					$RSAPrivateKey = pack(
 						'Ca*a*Ca*a*',
 						CRYPT_RSA_ASN1_INTEGER,
 						"\01\00",
@@ -511,7 +577,8 @@ class Crypt_RSA
 
 				if (!empty($this->password) || is_string($this->password)) {
 					$iv = crypt_random_string(8);
-					$symkey = pack('H*', md5($this->password . $iv)); 					$symkey.= substr(pack('H*', md5($symkey . $this->password . $iv)), 0, 8);
+					$symkey = pack('H*', md5($this->password . $iv));
+					$symkey.= substr(pack('H*', md5($symkey . $this->password . $iv)), 0, 8);
 					if (!class_exists('Crypt_TripleDES')) {
 						include_once 'Crypt/TripleDES.php';
 					}
@@ -552,11 +619,14 @@ class Crypt_RSA
 						'</RSAKeyValue>';
 				break;
 			case CRYPT_RSA_PUBLIC_FORMAT_OPENSSH:
-																				$RSAPublicKey = pack('Na*Na*Na*', strlen('ssh-rsa'), 'ssh-rsa', strlen($publicExponent), $publicExponent, strlen($modulus), $modulus);
+
+				$RSAPublicKey = pack('Na*Na*Na*', strlen('ssh-rsa'), 'ssh-rsa', strlen($publicExponent), $publicExponent, strlen($modulus), $modulus);
 				$RSAPublicKey = 'ssh-rsa ' . base64_encode($RSAPublicKey) . ' ' . $this->comment;
 
 				return $RSAPublicKey;
-			default: 																								$components = array(
+			default:
+
+				$components = array(
 					'modulus' => pack('Ca*a*', CRYPT_RSA_ASN1_INTEGER, $this->_encodeLength(strlen($modulus)), $modulus),
 					'publicExponent' => pack('Ca*a*', CRYPT_RSA_ASN1_INTEGER, $this->_encodeLength(strlen($publicExponent)), $publicExponent)
 				);
@@ -574,7 +644,9 @@ class Crypt_RSA
 									chunk_split(base64_encode($RSAPublicKey), 64) .
 									'-----END RSA PUBLIC KEY-----';
 				} else {
-										$rsaOID = pack('H*', '300d06092a864886f70d0101010500'); 					$RSAPublicKey = chr(0) . $RSAPublicKey;
+
+					$rsaOID = pack('H*', '300d06092a864886f70d0101010500');
+					$RSAPublicKey = chr(0) . $RSAPublicKey;
 					$RSAPublicKey = chr(3) . $this->_encodeLength(strlen($RSAPublicKey)) . $RSAPublicKey;
 
 					$RSAPublicKey = pack(
@@ -638,8 +710,10 @@ class Crypt_RSA
 
 				if (preg_match('#DEK-Info: (.+),(.+)#', $key, $matches)) {
 					$iv = pack('H*', trim($matches[2]));
-					$symkey = pack('H*', md5($this->password . substr($iv, 0, 8))); 					$symkey.= pack('H*', md5($symkey . $this->password . substr($iv, 0, 8)));
-										$key = preg_replace('#^(?:Proc-Type|DEK-Info): .*#m', '', $key);
+					$symkey = pack('H*', md5($this->password . substr($iv, 0, 8)));
+					$symkey.= pack('H*', md5($symkey . $this->password . substr($iv, 0, 8)));
+
+					$key = preg_replace('#^(?:Proc-Type|DEK-Info): .*#m', '', $key);
 					$ciphertext = $this->_extractBER($key);
 					if ($ciphertext === false) {
 						$ciphertext = $key;
@@ -714,21 +788,26 @@ class Crypt_RSA
 					}
 					$length = $this->_decodeLength($temp);
 					switch ($this->_string_shift($temp, $length)) {
-						case "\x2a\x86\x48\x86\xf7\x0d\x01\x01\x01": 							break;
+						case "\x2a\x86\x48\x86\xf7\x0d\x01\x01\x01":
+						case "\x2A\x86\x48\x86\xF7\x0D\x01\x01\x0A":
+							break;
 						case "\x2a\x86\x48\x86\xf7\x0d\x01\x05\x03":
+
 							if (ord($this->_string_shift($temp)) != CRYPT_RSA_ASN1_SEQUENCE) {
 								return false;
 							}
 							if ($this->_decodeLength($temp) != strlen($temp)) {
 								return false;
 							}
-							$this->_string_shift($temp); 							$salt = $this->_string_shift($temp, $this->_decodeLength($temp));
+							$this->_string_shift($temp);
+							$salt = $this->_string_shift($temp, $this->_decodeLength($temp));
 							if (ord($this->_string_shift($temp)) != CRYPT_RSA_ASN1_INTEGER) {
 								return false;
 							}
 							$this->_decodeLength($temp);
 							list(, $iterationCount) = unpack('N', str_pad($temp, 4, chr(0), STR_PAD_LEFT));
-							$this->_string_shift($key); 							$length = $this->_decodeLength($key);
+							$this->_string_shift($key);
+							$length = $this->_decodeLength($key);
 							if (strlen($key) != $length) {
 								return false;
 							}
@@ -747,7 +826,10 @@ class Crypt_RSA
 							return false;
 					}
 
-					$tag = ord($this->_string_shift($key)); 					$this->_decodeLength($key); 																				if ($tag == CRYPT_RSA_ASN1_BITSTRING) {
+					$tag = ord($this->_string_shift($key));
+					$this->_decodeLength($key);
+
+					if ($tag == CRYPT_RSA_ASN1_BITSTRING) {
 						$this->_string_shift($key);
 					}
 					if (ord($this->_string_shift($key)) != CRYPT_RSA_ASN1_SEQUENCE) {
@@ -766,7 +848,8 @@ class Crypt_RSA
 				$temp = $this->_string_shift($key, $length);
 				if (strlen($temp) != 1 || ord($temp) > 2) {
 					$components['modulus'] = new Math_BigInteger($temp, 256);
-					$this->_string_shift($key); 					$length = $this->_decodeLength($key);
+					$this->_string_shift($key);
+					$length = $this->_decodeLength($key);
 					$components[$type == CRYPT_RSA_PUBLIC_FORMAT_PKCS1 ? 'publicExponent' : 'privateExponent'] = new Math_BigInteger($this->_string_shift($key, $length), 256);
 
 					return $components;
@@ -862,23 +945,42 @@ class Crypt_RSA
 						'comment' => $comment
 					);
 				}
-									case CRYPT_RSA_PRIVATE_FORMAT_XML:
+
+			case CRYPT_RSA_PRIVATE_FORMAT_XML:
 			case CRYPT_RSA_PUBLIC_FORMAT_XML:
+				if (!extension_loaded('xml')) {
+					return false;
+				}
+
 				$this->components = array();
 
 				$xml = xml_parser_create('UTF-8');
 				xml_set_object($xml, $this);
 				xml_set_element_handler($xml, '_start_element_handler', '_stop_element_handler');
 				xml_set_character_data_handler($xml, '_data_handler');
-								if (!xml_parse($xml, '<xml>' . $key . '</xml>')) {
+
+				if (!xml_parse($xml, '<xml>' . $key . '</xml>')) {
+					xml_parser_free($xml);
+					unset($xml);
 					return false;
 				}
 
+				xml_parser_free($xml);
+				unset($xml);
+
 				return isset($this->components['modulus']) && isset($this->components['publicExponent']) ? $this->components : false;
-						case CRYPT_RSA_PRIVATE_FORMAT_PUTTY:
+
+			case CRYPT_RSA_PRIVATE_FORMAT_PUTTY:
 				$components = array();
 				$key = preg_split('#\r\n|\r|\n#', $key);
-				$type = trim(preg_replace('#PuTTY-User-Key-File-2: (.+)#', '$1', $key[0]));
+				if ($this->_string_shift($key[0], strlen('PuTTY-User-Key-File-')) != 'PuTTY-User-Key-File-') {
+					return false;
+				}
+				$version = (int) $this->_string_shift($key[0], 3);
+				if ($version != 2 && $version != 3) {
+					return false;
+				}
+				$type = rtrim($key[0]);
 				if ($type != 'ssh-rsa') {
 					return false;
 				}
@@ -893,26 +995,58 @@ class Crypt_RSA
 				extract(unpack('Nlength', $this->_string_shift($public, 4)));
 				$components['modulus'] = new Math_BigInteger($this->_string_shift($public, $length), -256);
 
-				$privateLength = trim(preg_replace('#Private-Lines: (\d+)#', '$1', $key[$publicLength + 4]));
-				$private = base64_decode(implode('', array_map('trim', array_slice($key, $publicLength + 5, $privateLength))));
-
+				$offset = $publicLength + 4;
 				switch ($encryption) {
 					case 'aes256-cbc':
 						if (!class_exists('Crypt_AES')) {
 							include_once 'Crypt/AES.php';
 						}
-						$symkey = '';
-						$sequence = 0;
-						while (strlen($symkey) < 32) {
-							$temp = pack('Na*', $sequence++, $this->password);
-							$symkey.= pack('H*', sha1($temp));
-						}
-						$symkey = substr($symkey, 0, 32);
 						$crypto = new Crypt_AES();
+						switch ($version) {
+							case 3:
+								if (!function_exists('sodium_crypto_pwhash')) {
+									return false;
+								}
+								$flavour = trim(preg_replace('#Key-Derivation: (.*)#', '$1', $key[$offset++]));
+								switch ($flavour) {
+									case 'Argon2i':
+										$flavour = SODIUM_CRYPTO_PWHASH_ALG_ARGON2I13;
+										break;
+									case 'Argon2id':
+										$flavour = SODIUM_CRYPTO_PWHASH_ALG_ARGON2ID13;
+										break;
+									default:
+										return false;
+								}
+								$memory = trim(preg_replace('#Argon2-Memory: (\d+)#', '$1', $key[$offset++]));
+								$passes = trim(preg_replace('#Argon2-Passes: (\d+)#', '$1', $key[$offset++]));
+								$parallelism = trim(preg_replace('#Argon2-Parallelism: (\d+)#', '$1', $key[$offset++]));
+								$salt = pack('H*', trim(preg_replace('#Argon2-Salt: ([0-9a-f]+)#', '$1', $key[$offset++])));
+
+								$length = 80;
+								$temp = sodium_crypto_pwhash($length, $this->password, $salt, $passes, $memory << 10, $flavour);
+
+								$symkey = substr($temp, 0, 32);
+								$symiv = substr($temp, 32, 16);
+								break;
+							case 2:
+								$symkey = '';
+								$sequence = 0;
+								while (strlen($symkey) < 32) {
+									$temp = pack('Na*', $sequence++, $this->password);
+									$symkey.= pack('H*', sha1($temp));
+								}
+								$symkey = substr($symkey, 0, 32);
+								$symiv = str_repeat("\0", 16);
+						}
 				}
+
+				$privateLength = trim(preg_replace('#Private-Lines: (\d+)#', '$1', $key[$offset++]));
+				$private = base64_decode(implode('', array_map('trim', array_slice($key, $offset, $privateLength))));
 
 				if ($encryption != 'none') {
 					$crypto->setKey($symkey);
+					$crypto->setIV($symiv);
 					$crypto->disablePadding();
 					$private = $crypto->decrypt($private);
 					if ($private === false) {
@@ -948,7 +1082,115 @@ class Crypt_RSA
 				$components['coefficients'] = array(2 => new Math_BigInteger($this->_string_shift($private, $length), -256));
 
 				return $components;
+			case CRYPT_RSA_PRIVATE_FORMAT_OPENSSH:
+				$components = array();
+				$decoded = $this->_extractBER($key);
+				$magic = $this->_string_shift($decoded, 15);
+				if ($magic !== "openssh-key-v1\0") {
+					return false;
+				}
+				extract(unpack('Nlength', $this->_string_shift($decoded, 4)));
+				if (strlen($decoded) < $length) {
+					return false;
+				}
+				$ciphername = $this->_string_shift($decoded, $length);
+				extract(unpack('Nlength', $this->_string_shift($decoded, 4)));
+				if (strlen($decoded) < $length) {
+					return false;
+				}
+				$kdfname = $this->_string_shift($decoded, $length);
+				extract(unpack('Nlength', $this->_string_shift($decoded, 4)));
+				if (strlen($decoded) < $length) {
+					return false;
+				}
+				$kdfoptions = $this->_string_shift($decoded, $length);
+				extract(unpack('Nnumkeys', $this->_string_shift($decoded, 4)));
+				if ($numkeys != 1 || ($ciphername != 'none' && $kdfname != 'bcrypt')) {
+					return false;
+				}
+				switch ($ciphername) {
+					case 'none':
+						break;
+					case 'aes256-ctr':
+						extract(unpack('Nlength', $this->_string_shift($kdfoptions, 4)));
+						if (strlen($kdfoptions) < $length) {
+							return false;
+						}
+						$salt = $this->_string_shift($kdfoptions, $length);
+						extract(unpack('Nrounds', $this->_string_shift($kdfoptions, 4)));
+						if (!class_exists('Crypt_AES')) {
+							include_once 'Crypt/AES.php';
+						}
+						$crypto = new Crypt_AES(CRYPT_MODE_CTR);
+						$crypto->disablePadding();
+						if (!$crypto->setPassword($this->password, 'bcrypt', $salt, $rounds, 32)) {
+							return false;
+						}
+						break;
+					default:
+						return false;
+				}
+				extract(unpack('Nlength', $this->_string_shift($decoded, 4)));
+				if (strlen($decoded) < $length) {
+					return false;
+				}
+				$publicKey = $this->_string_shift($decoded, $length);
+				extract(unpack('Nlength', $this->_string_shift($decoded, 4)));
+				if (strlen($decoded) < $length) {
+					return false;
+				}
+
+				if ($this->_string_shift($publicKey, 11) !== "\0\0\0\7ssh-rsa") {
+					return false;
+				}
+
+				$paddedKey = $this->_string_shift($decoded, $length);
+				if (isset($crypto)) {
+					$paddedKey = $crypto->decrypt($paddedKey);
+				}
+
+				$checkint1 = $this->_string_shift($paddedKey, 4);
+				$checkint2 = $this->_string_shift($paddedKey, 4);
+				if (strlen($checkint1) != 4 || $checkint1 !== $checkint2) {
+					return false;
+				}
+
+				if ($this->_string_shift($paddedKey, 11) !== "\0\0\0\7ssh-rsa") {
+					return false;
+				}
+
+				$values = array(
+					&$components['modulus'],
+					&$components['publicExponent'],
+					&$components['privateExponent'],
+					&$components['coefficients'][2],
+					&$components['primes'][1],
+					&$components['primes'][2]
+				);
+
+				for ($i = 0; $i < count($values); $i++) {
+					extract(unpack('Nlength', $this->_string_shift($paddedKey, 4)));
+					if (strlen($paddedKey) < $length) {
+						return false;
+					}
+					$values[$i] = new Math_BigInteger($this->_string_shift($paddedKey, $length), -256);
+				}
+
+				extract(unpack('Nlength', $this->_string_shift($paddedKey, 4)));
+				if (strlen($paddedKey) < $length) {
+					return false;
+				}
+				$components['comment'] = $this->_string_shift($decoded, $length);
+
+				$temp = $components['primes'][1]->subtract($this->one);
+				$components['exponents'] = array(1 => $components['publicExponent']->modInverse($temp));
+				$temp = $components['primes'][2]->subtract($this->one);
+				$components['exponents'][] = $components['publicExponent']->modInverse($temp);
+
+				return $components;
 		}
+
+		return false;
 	}
 
 	function getSize()
@@ -958,7 +1200,8 @@ class Crypt_RSA
 
 	function _start_element_handler($parser, $name, $attribs)
 	{
-				switch ($name) {
+
+		switch ($name) {
 			case 'MODULUS':
 				$this->current = &$this->components['modulus'];
 				break;
@@ -1057,7 +1300,8 @@ class Crypt_RSA
 				CRYPT_RSA_PRIVATE_FORMAT_PKCS1,
 				CRYPT_RSA_PRIVATE_FORMAT_XML,
 				CRYPT_RSA_PRIVATE_FORMAT_PUTTY,
-				CRYPT_RSA_PUBLIC_FORMAT_OPENSSH
+				CRYPT_RSA_PUBLIC_FORMAT_OPENSSH,
+				CRYPT_RSA_PRIVATE_FORMAT_OPENSSH
 			);
 			foreach ($types as $type) {
 				$components = $this->_parseKey($key, $type);
@@ -1123,7 +1367,8 @@ class Crypt_RSA
 
 	function setPublicKey($key = false, $type = false)
 	{
-				if (!empty($this->publicExponent)) {
+
+		if (!empty($this->publicExponent)) {
 			return false;
 		}
 
@@ -1177,7 +1422,7 @@ class Crypt_RSA
 		}
 		$rsa->publicExponent = false;
 
-				$this->loadKey($rsa);
+		$this->loadKey($rsa);
 		return true;
 	}
 
@@ -1282,7 +1527,8 @@ class Crypt_RSA
 	function _decodeLength(&$string)
 	{
 		$length = ord($this->_string_shift($string));
-		if ($length & 0x80) { 			$length&= 0x7F;
+		if ($length & 0x80) {
+			$length&= 0x7F;
 			$temp = $this->_string_shift($string, $length);
 			list(, $length) = unpack('N', substr(str_pad($temp, 4, chr(0), STR_PAD_LEFT), -4));
 		}
@@ -1318,7 +1564,8 @@ class Crypt_RSA
 
 	function setHash($hash)
 	{
-				switch ($hash) {
+
+		switch ($hash) {
 			case 'md2':
 			case 'md5':
 			case 'sha1':
@@ -1337,7 +1584,8 @@ class Crypt_RSA
 
 	function setMGFHash($hash)
 	{
-				switch ($hash) {
+
+		switch ($hash) {
 			case 'md2':
 			case 'md5':
 			case 'sha1':
@@ -1460,16 +1708,21 @@ class Crypt_RSA
 
 	function _equals($x, $y)
 	{
+		if (function_exists('hash_equals')) {
+			return hash_equals($x, $y);
+		}
+
 		if (strlen($x) != strlen($y)) {
 			return false;
 		}
 
-		$result = 0;
+		$result = "\0";
+		$x^= $y;
 		for ($i = 0; $i < strlen($x); $i++) {
-			$result |= ord($x[$i]) ^ ord($y[$i]);
+			$result|= $x[$i];
 		}
 
-		return $result == 0;
+		return $result === "\0";
 	}
 
 	function _rsaep($m)
@@ -1573,17 +1826,22 @@ class Crypt_RSA
 		$db = $maskedDB ^ $dbMask;
 		$lHash2 = substr($db, 0, $this->hLen);
 		$m = substr($db, $this->hLen);
-		if (!$this->_equals($lHash, $lHash2)) {
-			user_error('Decryption error');
-			return false;
+		$hashesMatch = $this->_equals($lHash, $lHash2);
+		$leadingZeros = 1;
+		$patternMatch = 0;
+		$offset = 0;
+		for ($i = 0; $i < strlen($m); $i++) {
+			$patternMatch|= $leadingZeros & ($m[$i] === "\1");
+			$leadingZeros&= $m[$i] === "\0";
+			$offset+= $patternMatch ? 0 : 1;
 		}
-		$m = ltrim($m, chr(0));
-		if (ord($m[0]) != 1) {
+
+		if (!$hashesMatch | !$patternMatch) {
 			user_error('Decryption error');
 			return false;
 		}
 
-		return substr($m, 1);
+		return substr($m, $offset + 1);
 	}
 
 	function _raw_encrypt($m)
@@ -1610,13 +1868,15 @@ class Crypt_RSA
 			$ps.= $temp;
 		}
 		$type = 2;
-				if (defined('CRYPT_RSA_PKCS15_COMPAT') && (!isset($this->publicExponent) || $this->exponent !== $this->publicExponent)) {
+
+		if (defined('CRYPT_RSA_PKCS15_COMPAT') && (!isset($this->publicExponent) || $this->exponent !== $this->publicExponent)) {
 			$type = 1;
-						$ps = str_repeat("\xFF", $psLen);
+
+			$ps = str_repeat("\xFF", $psLen);
 		}
 		$em = chr(0) . chr($type) . $ps . chr(0) . $m;
 
-				$m = $this->_os2ip($em);
+		$m = $this->_os2ip($em);
 		$c = $this->_rsaep($m);
 		$c = $this->_i2osp($c, $this->k);
 
@@ -1626,7 +1886,8 @@ class Crypt_RSA
 	function _rsaes_pkcs1_v1_5_decrypt($c)
 	{
 
-		if (strlen($c) != $this->k) { 			user_error('Decryption error');
+		if (strlen($c) != $this->k) {
+			user_error('Decryption error');
 			return false;
 		}
 
@@ -1658,7 +1919,8 @@ class Crypt_RSA
 	function _emsa_pss_encode($m, $emBits)
 	{
 
-		$emLen = ($emBits + 1) >> 3; 		$sLen = $this->sLen !== null ? $this->sLen : $this->hLen;
+		$emLen = ($emBits + 1) >> 3;
+		$sLen = $this->sLen !== null ? $this->sLen : $this->hLen;
 
 		$mHash = $this->hash->hash($m);
 		if ($emLen < $this->hLen + $sLen + 2) {
@@ -1682,7 +1944,8 @@ class Crypt_RSA
 	function _emsa_pss_verify($m, $em, $emBits)
 	{
 
-		$emLen = ($emBits + 1) >> 3; 		$sLen = $this->sLen !== null ? $this->sLen : $this->hLen;
+		$emLen = ($emBits + 7) >> 3;
+		$sLen = $this->sLen !== null ? $this->sLen : $this->hLen;
 
 		$mHash = $this->hash->hash($m);
 		if ($emLen < $this->hLen + $sLen + 2) {
@@ -1706,7 +1969,8 @@ class Crypt_RSA
 		if (substr($db, 0, $temp) != str_repeat(chr(0), $temp) || ord($db[$temp]) != 1) {
 			return false;
 		}
-		$salt = substr($db, $temp + 1); 		$m2 = "\0\0\0\0\0\0\0\0" . $mHash . $salt;
+		$salt = substr($db, $temp + 1);
+		$m2 = "\0\0\0\0\0\0\0\0" . $mHash . $salt;
 		$h2 = $this->hash->hash($m2);
 		return $this->_equals($h, $h2);
 	}
@@ -1731,7 +1995,7 @@ class Crypt_RSA
 			return false;
 		}
 
-		$modBits = 8 * $this->k;
+		$modBits = strlen($this->modulus->toBits());
 
 		$s2 = $this->_os2ip($s);
 		$m2 = $this->_rsavp1($s2);
@@ -1739,7 +2003,7 @@ class Crypt_RSA
 			user_error('Invalid signature');
 			return false;
 		}
-		$em = $this->_i2osp($m2, $modBits >> 3);
+		$em = $this->_i2osp($m2, $this->k);
 		if ($em === false) {
 			user_error('Invalid signature');
 			return false;
@@ -1755,7 +2019,7 @@ class Crypt_RSA
 			return false;
 		}
 
-				switch ($this->hashName) {
+		switch ($this->hashName) {
 			case 'md2':
 				$t = pack('H*', '3020300c06082a864886f70d020205000410');
 				break;
@@ -1773,6 +2037,44 @@ class Crypt_RSA
 				break;
 			case 'sha512':
 				$t = pack('H*', '3051300d060960864801650304020305000440');
+		}
+		$t.= $h;
+		$tLen = strlen($t);
+
+		if ($emLen < $tLen + 11) {
+			user_error('Intended encoded message length too short');
+			return false;
+		}
+
+		$ps = str_repeat(chr(0xFF), $emLen - $tLen - 3);
+
+		$em = "\0\1$ps\0$t";
+
+		return $em;
+	}
+
+	function _emsa_pkcs1_v1_5_encode_without_null($m, $emLen)
+	{
+		$h = $this->hash->hash($m);
+		if ($h === false) {
+			return false;
+		}
+
+		switch ($this->hashName) {
+			case 'sha1':
+				$t = pack('H*', '301f300706052b0e03021a0414');
+				break;
+			case 'sha256':
+				$t = pack('H*', '302f300b06096086480165030402010420');
+				break;
+			case 'sha384':
+				$t = pack('H*', '303f300b06096086480165030402020430');
+				break;
+			case 'sha512':
+				$t = pack('H*', '304f300b06096086480165030402030440');
+				break;
+			default:
+				return false;
 		}
 		$t.= $h;
 		$tLen = strlen($t);
@@ -1826,12 +2128,15 @@ class Crypt_RSA
 		}
 
 		$em2 = $this->_emsa_pkcs1_v1_5_encode($m, $this->k);
-		if ($em2 === false) {
+		$em3 = $this->_emsa_pkcs1_v1_5_encode_without_null($m, $this->k);
+
+		if ($em2 === false && $em3 === false) {
 			user_error('RSA modulus too short');
 			return false;
 		}
 
-				return $this->_equals($em, $em2);
+		return ($em2 !== false && $this->_equals($em, $em2)) ||
+				($em3 !== false && $this->_equals($em, $em3));
 	}
 
 	function setEncryptionMode($mode)
@@ -1876,7 +2181,8 @@ class Crypt_RSA
 					$ciphertext.= $this->_rsaes_pkcs1_v1_5_encrypt($m);
 				}
 				return $ciphertext;
-						default:
+
+			default:
 				$length = $this->k - 2 * $this->hLen - 2;
 				if ($length <= 0) {
 					return false;
@@ -1909,7 +2215,8 @@ class Crypt_RSA
 			case CRYPT_RSA_ENCRYPTION_PKCS1:
 				$decrypt = '_rsaes_pkcs1_v1_5_decrypt';
 				break;
-						default:
+
+			default:
 				$decrypt = '_rsaes_oaep_decrypt';
 		}
 
@@ -1933,7 +2240,8 @@ class Crypt_RSA
 		switch ($this->signatureMode) {
 			case CRYPT_RSA_SIGNATURE_PKCS1:
 				return $this->_rsassa_pkcs1_v1_5_sign($message);
-						default:
+
+			default:
 				return $this->_rsassa_pss_sign($message);
 		}
 	}
@@ -1947,7 +2255,8 @@ class Crypt_RSA
 		switch ($this->signatureMode) {
 			case CRYPT_RSA_SIGNATURE_PKCS1:
 				return $this->_rsassa_pkcs1_v1_5_verify($message, $signature);
-						default:
+
+			default:
 				return $this->_rsassa_pss_verify($message, $signature);
 		}
 	}
@@ -1956,8 +2265,10 @@ class Crypt_RSA
 	{
 
 		$temp = preg_replace('#.*?^-+[^-]+-+[\r\n ]*$#ms', '', $str, 1);
-				$temp = preg_replace('#-+[^-]+-+#', '', $temp);
-				$temp = str_replace(array("\r", "\n", ' '), '', $temp);
+
+		$temp = preg_replace('#-+[^-]+-+#', '', $temp);
+
+		$temp = str_replace(array("\r", "\n", ' '), '', $temp);
 		$temp = preg_match('#^[a-zA-Z\d/+]*={0,2}$#', $temp) ? base64_decode($temp) : false;
 		return $temp != false ? $temp : $str;
 	}

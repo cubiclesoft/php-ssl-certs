@@ -25,6 +25,8 @@ class Crypt_Hash
 
 	var $ipad;
 
+	var $engine;
+
 	function __construct($hash = 'sha1')
 	{
 		if (!defined('CRYPT_HASH_MODE')) {
@@ -66,7 +68,7 @@ class Crypt_Hash
 			return;
 		}
 
-		switch ($mode) {
+		switch ($this->engine) {
 			case CRYPT_HASH_MODE_MHASH:
 				$this->computedKey = mhash($this->hash, $this->key);
 				break;
@@ -92,7 +94,8 @@ class Crypt_Hash
 			case 'sha256-96':
 			case 'sha512-96':
 				$hash = substr($hash, 0, -3);
-				$this->l = 12; 				break;
+				$this->l = 12;
+				break;
 			case 'md2':
 			case 'md5':
 				$this->l = 16;
@@ -131,18 +134,18 @@ class Crypt_Hash
 
 		switch ($hash) {
 			case 'md2':
-				$mode = CRYPT_HASH_MODE == CRYPT_HASH_MODE_HASH && in_array('md2', hash_algos()) ?
+				$this->engine = CRYPT_HASH_MODE == CRYPT_HASH_MODE_HASH && in_array('md2', hash_algos()) ?
 					CRYPT_HASH_MODE_HASH : CRYPT_HASH_MODE_INTERNAL;
 				break;
 			case 'sha384':
 			case 'sha512':
-				$mode = CRYPT_HASH_MODE == CRYPT_HASH_MODE_MHASH ? CRYPT_HASH_MODE_INTERNAL : CRYPT_HASH_MODE;
+				$this->engine = CRYPT_HASH_MODE == CRYPT_HASH_MODE_MHASH ? CRYPT_HASH_MODE_INTERNAL : CRYPT_HASH_MODE;
 				break;
 			default:
-				$mode = CRYPT_HASH_MODE;
+				$this->engine = CRYPT_HASH_MODE;
 		}
 
-		switch ($mode) {
+		switch ($this->engine) {
 			case CRYPT_HASH_MODE_MHASH:
 				switch ($hash) {
 					case 'md5':
@@ -203,10 +206,8 @@ class Crypt_Hash
 
 	function hash($text)
 	{
-		$mode = is_array($this->hash) ? CRYPT_HASH_MODE_INTERNAL : CRYPT_HASH_MODE;
-
 		if (!empty($this->key) || is_string($this->key)) {
-			switch ($mode) {
+			switch ($this->engine) {
 				case CRYPT_HASH_MODE_MHASH:
 					$output = mhash($this->hash, $text, $this->computedKey);
 					break;
@@ -214,9 +215,16 @@ class Crypt_Hash
 					$output = hash_hmac($this->hash, $text, $this->computedKey, true);
 					break;
 				case CRYPT_HASH_MODE_INTERNAL:
-					$key	= str_pad($this->computedKey, $this->b, chr(0)); 					$temp	= $this->ipad ^ $key;												$temp	.= $text;										 					$temp	= call_user_func($this->hash, $temp);								$output = $this->opad ^ $key;												$output.= $temp;										 					$output = call_user_func($this->hash, $output);						}
+					$key	= str_pad($this->computedKey, $this->b, chr(0));
+					$temp	= $this->ipad ^ $key;
+					$temp	.= $text;
+					$temp	= call_user_func($this->hash, $temp);
+					$output = $this->opad ^ $key;
+					$output.= $temp;
+					$output = call_user_func($this->hash, $output);
+			}
 		} else {
-			switch ($mode) {
+			switch ($this->engine) {
 				case CRYPT_HASH_MODE_MHASH:
 					$output = mhash($this->hash, $text);
 					break;
@@ -269,16 +277,17 @@ class Crypt_Hash
 			 31,	26, 219, 153, 141,	51, 159,	17, 131, 20
 		);
 
-				$pad = 16 - (strlen($m) & 0xF);
+		$pad = 16 - (strlen($m) & 0xF);
 		$m.= str_repeat(chr($pad), $pad);
 
 		$length = strlen($m);
 
-				$c = str_repeat(chr(0), 16);
+		$c = str_repeat(chr(0), 16);
 		$l = chr(0);
 		for ($i = 0; $i < $length; $i+= 16) {
 			for ($j = 0; $j < 16; $j++) {
-																$c[$j] = chr($s[ord($m[$i + $j] ^ $l)] ^ ord($c[$j]));
+
+				$c[$j] = chr($s[ord($m[$i + $j] ^ $l)] ^ ord($c[$j]));
 				$l = $c[$j];
 			}
 		}
@@ -286,9 +295,9 @@ class Crypt_Hash
 
 		$length+= 16;
 
-				$x = str_repeat(chr(0), 48);
+		$x = str_repeat(chr(0), 48);
 
-				for ($i = 0; $i < $length; $i+= 16) {
+		for ($i = 0; $i < $length; $i+= 16) {
 			for ($j = 0; $j < 16; $j++) {
 				$x[$j + 16] = $m[$i + $j];
 				$x[$j + 32] = $x[$j + 16] ^ $x[$j];
@@ -297,12 +306,13 @@ class Crypt_Hash
 			for ($j = 0; $j < 18; $j++) {
 				for ($k = 0; $k < 48; $k++) {
 					$x[$k] = $t = $x[$k] ^ chr($s[ord($t)]);
-									}
+
+				}
 				$t = chr(ord($t) + $j);
 			}
 		}
 
-				return substr($x, 0, 16);
+		return substr($x, 0, 16);
 	}
 
 	function _sha256($m)
@@ -311,10 +321,11 @@ class Crypt_Hash
 			return pack('H*', sha256($m));
 		}
 
-				$hash = array(
+		$hash = array(
 			0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19
 		);
-						static $k = array(
+
+		static $k = array(
 			0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
 			0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
 			0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
@@ -325,12 +336,14 @@ class Crypt_Hash
 			0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
 		);
 
-				$length = strlen($m);
-				$m.= str_repeat(chr(0), 64 - (($length + 8) & 0x3F));
-		$m[$length] = chr(0x80);
-				$m.= pack('N2', 0, $length << 3);
+		$length = strlen($m);
 
-				$chunks = str_split($m, 64);
+		$m.= str_repeat(chr(0), 64 - (($length + 8) & 0x3F));
+		$m[$length] = chr(0x80);
+
+		$m.= pack('N2', 0, $length << 3);
+
+		$chunks = str_split($m, 64);
 		foreach ($chunks as $chunk) {
 			$w = array();
 			for ($i = 0; $i < 16; $i++) {
@@ -338,19 +351,21 @@ class Crypt_Hash
 				$w[] = $temp;
 			}
 
-						for ($i = 16; $i < 64; $i++) {
-								$s0 = $this->_rightRotate($w[$i - 15],	7) ^
+			for ($i = 16; $i < 64; $i++) {
+
+				$s0 = $this->_rightRotate($w[$i - 15],	7) ^
 						$this->_rightRotate($w[$i - 15], 18) ^
 						$this->_rightShift( $w[$i - 15],	3);
 				$s1 = $this->_rightRotate($w[$i - 2], 17) ^
 						$this->_rightRotate($w[$i - 2], 19) ^
 						$this->_rightShift( $w[$i - 2], 10);
-								$w[$i] = $this->_add($w[$i - 16], $s0, $w[$i - 7], $s1);
+
+				$w[$i] = $this->_add($w[$i - 16], $s0, $w[$i - 7], $s1);
 			}
 
-						list($a, $b, $c, $d, $e, $f, $g, $h) = $hash;
+			list($a, $b, $c, $d, $e, $f, $g, $h) = $hash;
 
-						for ($i = 0; $i < 64; $i++) {
+			for ($i = 0; $i < 64; $i++) {
 				$s0 = $this->_rightRotate($a,	2) ^
 						$this->_rightRotate($a, 13) ^
 						$this->_rightRotate($a, 22);
@@ -376,7 +391,7 @@ class Crypt_Hash
 				$a = $this->_add($t1, $t2);
 			}
 
-						$hash = array(
+			$hash = array(
 				$this->_add($hash[0], $a),
 				$this->_add($hash[1], $b),
 				$this->_add($hash[2], $c),
@@ -388,7 +403,7 @@ class Crypt_Hash
 			);
 		}
 
-				return pack('N8', $hash[0], $hash[1], $hash[2], $hash[3], $hash[4], $hash[5], $hash[6], $hash[7]);
+		return pack('N8', $hash[0], $hash[1], $hash[2], $hash[3], $hash[4], $hash[5], $hash[6], $hash[7]);
 	}
 
 	function _sha512($m)
@@ -400,10 +415,13 @@ class Crypt_Hash
 		static $init384, $init512, $k;
 
 		if (!isset($k)) {
-						$init384 = array( 				'cbbb9d5dc1059ed8', '629a292a367cd507', '9159015a3070dd17', '152fecd8f70e5939',
+
+			$init384 = array(
+				'cbbb9d5dc1059ed8', '629a292a367cd507', '9159015a3070dd17', '152fecd8f70e5939',
 				'67332667ffc00b31', '8eb44a8768581511', 'db0c2e0d64f98fa7', '47b5481dbefa4fa4'
 			);
-			$init512 = array( 				'6a09e667f3bcc908', 'bb67ae8584caa73b', '3c6ef372fe94f82b', 'a54ff53a5f1d36f1',
+			$init512 = array(
+				'6a09e667f3bcc908', 'bb67ae8584caa73b', '3c6ef372fe94f82b', 'a54ff53a5f1d36f1',
 				'510e527fade682d1', '9b05688c2b3e6c1f', '1f83d9abfb41bd6b', '5be0cd19137e2179'
 			);
 
@@ -414,7 +432,7 @@ class Crypt_Hash
 				$init512[$i]->setPrecision(64);
 			}
 
-									$k = array(
+			$k = array(
 				'428a2f98d728ae22', '7137449123ef65cd', 'b5c0fbcfec4d3b2f', 'e9b5dba58189dbbc',
 				'3956c25bf348b538', '59f111f1b605d019', '923f82a4af194f9b', 'ab1c5ed5da6d8118',
 				'd807aa98a3030242', '12835b0145706fbe', '243185be4ee4b28c', '550c7dc3d5ffb4e2',
@@ -444,12 +462,14 @@ class Crypt_Hash
 
 		$hash = $this->l == 48 ? $init384 : $init512;
 
-				$length = strlen($m);
-				$m.= str_repeat(chr(0), 128 - (($length + 16) & 0x7F));
-		$m[$length] = chr(0x80);
-				$m.= pack('N4', 0, 0, 0, $length << 3);
+		$length = strlen($m);
 
-				$chunks = str_split($m, 128);
+		$m.= str_repeat(chr(0), 128 - (($length + 16) & 0x7F));
+		$m[$length] = chr(0x80);
+
+		$m.= pack('N4', 0, 0, 0, $length << 3);
+
+		$chunks = str_split($m, 128);
 		foreach ($chunks as $chunk) {
 			$w = array();
 			for ($i = 0; $i < 16; $i++) {
@@ -458,7 +478,7 @@ class Crypt_Hash
 				$w[] = $temp;
 			}
 
-						for ($i = 16; $i < 80; $i++) {
+			for ($i = 16; $i < 80; $i++) {
 				$temp = array(
 							$w[$i - 15]->bitwise_rightRotate(1),
 							$w[$i - 15]->bitwise_rightRotate(8),
@@ -479,7 +499,7 @@ class Crypt_Hash
 				$w[$i] = $w[$i]->add($s1);
 			}
 
-						$a = $hash[0]->copy();
+			$a = $hash[0]->copy();
 			$b = $hash[1]->copy();
 			$c = $hash[2]->copy();
 			$d = $hash[3]->copy();
@@ -488,7 +508,7 @@ class Crypt_Hash
 			$g = $hash[6]->copy();
 			$h = $hash[7]->copy();
 
-						for ($i = 0; $i < 80; $i++) {
+			for ($i = 0; $i < 80; $i++) {
 				$temp = array(
 					$a->bitwise_rightRotate(28),
 					$a->bitwise_rightRotate(34),
@@ -532,7 +552,7 @@ class Crypt_Hash
 				$a = $t1->add($t2);
 			}
 
-						$hash = array(
+			$hash = array(
 				$hash[0]->add($a),
 				$hash[1]->add($b),
 				$hash[2]->add($c),
@@ -544,7 +564,7 @@ class Crypt_Hash
 			);
 		}
 
-						$temp = $hash[0]->toBytes() . $hash[1]->toBytes() . $hash[2]->toBytes() . $hash[3]->toBytes() .
+		$temp = $hash[0]->toBytes() . $hash[1]->toBytes() . $hash[2]->toBytes() . $hash[3]->toBytes() .
 				$hash[4]->toBytes() . $hash[5]->toBytes();
 		if ($this->l != 48) {
 			$temp.= $hash[6]->toBytes() . $hash[7]->toBytes();
@@ -586,8 +606,10 @@ class Crypt_Hash
 
 		switch (true) {
 			case is_int($result):
-						case version_compare(PHP_VERSION, '5.3.0') >= 0 && (php_uname('m') & "\xDF\xDF\xDF") != 'ARM':
-						case (PHP_OS & "\xDF\xDF\xDF") === 'WIN':
+
+			case version_compare(PHP_VERSION, '5.3.0') >= 0 && (php_uname('m') & "\xDF\xDF\xDF") != 'ARM':
+
+			case (PHP_OS & "\xDF\xDF\xDF") === 'WIN':
 				return fmod($result, $mod);
 		}
 
