@@ -1,6 +1,6 @@
 <?php
-	// SSL certificate management tools in pure PHP.
-	// (C) 2019 CubicleSoft.  All Rights Reserved.
+	// SSL/TLS certificate management tools in pure PHP.
+	// (C) 2025 CubicleSoft.  All Rights Reserved.
 
 	if (!isset($_SERVER["argc"]) || !$_SERVER["argc"])
 	{
@@ -31,8 +31,8 @@
 
 	if (isset($args["opts"]["help"]))
 	{
-		echo "SSL certificate command-line tool\n";
-		echo "Purpose:  Create and manage SSL certificates and certificate chains.\n";
+		echo "SSL/TLS certificate command-line tool\n";
+		echo "Purpose:  Create and manage SSL/TLS certificates and certificate chains.\n";
 		echo "\n";
 		echo "This tool is question/answer enabled.  Just running it will provide a guided interface.  It can also be run entirely from the command-line if you know all the answers.\n";
 		echo "\n";
@@ -54,7 +54,7 @@
 	$suppressoutput = (isset($args["opts"]["suppressoutput"]) && $args["opts"]["suppressoutput"]);
 
 	// Get the command.
-	$cmds = array("list" => "List all SSL storage objects", "init" => "Initialize a SSL storage object", "csr" => "Create a new Certificate Signing Request (CSR)", "self-sign" => "Self-sign a SSL certificate (should only be used for roots and personal certs)", "sign" => "Sign a CSR using a CA enabled certificate with a private key", "get-info" => "Get detailed information about a SSL storage object", "set-signer" => "Sets the signer for a certificate for verify/export purposes", "verify" => "Verifies a certificate chain to the root", "export" => "Exports a certificate and certificate chain for use with other software products", "import-csr" => "Imports an externally generated CSR", "import-cert" => "Imports a signed certificate", "rename" => "Renames a SSL certificate object and updates all child references to it", "delete" => "Deletes a SSL storage object");
+	$cmds = array("list" => "List all certificate storage objects", "init" => "Initialize a certificate storage object", "csr" => "Create a new Certificate Signing Request (CSR)", "self-sign" => "Self-sign a certificate (should only be used for roots and personal certs)", "sign" => "Sign a CSR using a CA enabled certificate with a private key", "get-info" => "Get detailed information about a certificate storage object", "set-signer" => "Sets the signer for a certificate for verify/export purposes", "verify" => "Verifies a certificate chain to the root", "export" => "Exports a certificate and certificate chain for use with other software products", "import-csr" => "Imports an externally generated CSR", "import-cert" => "Imports a signed certificate", "rename" => "Renames a certificate object and updates all child references to it", "delete" => "Deletes a certificate storage object");
 
 	$cmd = CLI::GetLimitedUserInputWithArgs($args, false, "Command", false, "Available commands:", $cmds, true, $suppressoutput);
 
@@ -69,12 +69,7 @@
 		exit();
 	}
 
-	require_once $rootpath . "/support/phpseclib/Crypt/RSA.php";
-	require_once $rootpath . "/support/phpseclib/Math/BigInteger.php";
-	require_once $rootpath . "/support/phpseclib/File/X509.php";
-
-	$path = get_include_path();
-	if (strpos($path, PATH_SEPARATOR . $rootpath . "/support/phpseclib/") === false)  set_include_path($path . PATH_SEPARATOR . $rootpath . "/support/phpseclib/");
+	require_once $rootpath . "/support/phpseclib3/phpseclib3.php";
 
 	function SSLObjectsList()
 	{
@@ -114,15 +109,35 @@
 		return $result;
 	}
 
+	function InitLastCSRAnswers($info)
+	{
+		$defaults = array(
+			"pkimode" => "ec",
+			"algorithm" => "secp256r1",
+			"numbits" => "4096",
+			"digest" => "sha256",
+			"domains" => array(),
+			"keyusage" => "digitalSignature, keyEncipherment, keyAgreement",
+			"country" => "",
+			"state" => "",
+			"city" => "",
+			"org" => "",
+			"orgunit" => "",
+			"email" => "",
+		);
+
+		return $info + $defaults;
+	}
+
 	function ExtractCSRInfo($info)
 	{
-		$csr = new File_X509();
+		$csr = new \phpseclib3\File\X509();
 		$csr->loadCSR($info["csr"]);
 
 		$result = array();
 		$result["privatekey"] = (isset($info["privatekey"]) && $info["privatekey"] !== "");
 		$result["created"] = $info["created"];
-		$result["dn"] = (string)$csr->getDN(FILE_X509_DN_STRING);
+		$result["dn"] = (string)$csr->getDN(\phpseclib3\File\X509::DN_STRING);
 
 		$result["attrs"] = array();
 		$attributes = $csr->getAttributes();
@@ -143,7 +158,7 @@
 
 	function ExtractCertInfo($info)
 	{
-		$decoder = new File_X509();
+		$decoder = new \phpseclib3\File\X509();
 		$cert = $decoder->loadX509($info["cert"]);
 
 		$result = array();
@@ -166,8 +181,8 @@
 		$result["ca"] = $info["ca"];
 		$result["signer"] = $info["signer"];
 
-		$result["issuerdn"] = (string)$decoder->getIssuerDN(FILE_X509_DN_STRING);
-		$result["subjectdn"] = (string)$decoder->getSubjectDN(FILE_X509_DN_STRING);
+		$result["issuerdn"] = (string)$decoder->getIssuerDN(\phpseclib3\File\X509::DN_STRING);
+		$result["subjectdn"] = (string)$decoder->getSubjectDN(\phpseclib3\File\X509::DN_STRING);
 
 		$result["attrs"] = array();
 		$attributes = $decoder->getAttributes();
@@ -227,6 +242,15 @@
 		if (($mode === "all" || $mode === "csr") && $withprivatekey && isset($data["csrinfo"]) && !$data["csrinfo"]["privatekey"])  CLI::DisplayError("The file '" . $filename . "' does not contain a Certificate Signing Request (CSR) with a private key.");
 		if (($mode === "all" || $mode === "cert") && $withprivatekey && isset($data["certinfo"]) && !$data["certinfo"]["privatekey"])  CLI::DisplayError("The file '" . $filename . "' does not contain a certificate with a private key.");
 
+		// Upgrade old objects.
+		if (!isset($data["last_csr_answers"]["pkimode"]))
+		{
+			$data["last_csr_answers"]["pkimode"] = "rsa";
+			$data["last_csr_answers"]["algorithm"] = "rsa";
+		}
+
+		$data["last_csr_answers"] = InitLastCSRAnswers($data["last_csr_answers"]);
+
 		$result = array(
 			"id" => $id,
 			"filename" => $filename,
@@ -272,6 +296,11 @@
 		if (isset($args["opts"]["help"]))  DisplayResult(array("success" => true, "options" => array_keys($options["rules"])));
 	}
 
+	$pkimodes = array(
+		"ec" => "Elliptic Curve - newer, slightly less software support",
+		"rsa" => "RSA - broad software support"
+	);
+
 	$digests = array(
 		"md2" => "MD2 is very old, very broken - do not use",
 		"md5" => "MD5 is very old, very broken - do not use",
@@ -293,7 +322,7 @@
 		// Get the name of the new object.
 		do
 		{
-			$id = CLI::GetUserInputWithArgs($args, "id", "Storage object ID", false, "A storage object contains everything pertinent to a single SSL certificate:  CSR, answers to CSR questions for renewal purposes, private key, signed certificate, and parent/signer certificate object reference.  If this is for a domain (i.e. website), use the domain or subdomain name for easier tracking.", $suppressoutput);
+			$id = CLI::GetUserInputWithArgs($args, "id", "Storage object ID", false, "A storage object contains everything pertinent to a single certificate:  CSR, answers to CSR questions for renewal purposes, private key, signed certificate, and parent/signer certificate object reference.  If this is for a domain (i.e. website), use the domain or subdomain name for easier tracking.", $suppressoutput);
 			$id = Str::FilenameSafe($id);
 			$filename = $rootpath . "/certs/" . $id . ".json";
 			$found = file_exists($filename);
@@ -305,18 +334,7 @@
 
 		$data = array(
 			"last_serial" => 0,
-			"last_csr_answers" => array(
-				"numbits" => "4096",
-				"digest" => "sha256",
-				"domains" => array(),
-				"keyusage" => ($ca ? "keyCertSign, cRLSign" : "digitalSignature, keyEncipherment, keyAgreement"),
-				"country" => "",
-				"state" => "",
-				"city" => "",
-				"org" => "",
-				"orgunit" => "",
-				"email" => "",
-			),
+			"last_csr_answers" => InitLastCSRAnswers(array("keyusage" => ($ca ? "keyCertSign, cRLSign" : "digitalSignature, keyEncipherment, keyAgreement"))),
 			"created" => time()
 		);
 
@@ -335,7 +353,7 @@
 	}
 	else if ($cmd === "csr")
 	{
-		ReinitArgs(array("id", "bits", "digest", "domain", "keyusage", "country", "state", "city", "org", "orgunit", "email", "commonname"));
+		ReinitArgs(array("id", "pkimode", "algorithm", "bits", "digest", "domain", "keyusage", "country", "state", "city", "org", "orgunit", "email", "commonname"));
 
 		// Get the object ID for the new CSR.
 		$result = GetSSLObject();
@@ -344,12 +362,33 @@
 		$filename = $result["filename"];
 		$data = $result["data"];
 
-		// Number of bits.
-		do
+		// PKI mode.
+		$pkimode = CLI::GetLimitedUserInputWithArgs($args, "pkimode", "PKI mode/type", $data["last_csr_answers"]["pkimode"], "Available PKI modes/types:", $pkimodes, true, $suppressoutput);
+
+		if ($pkimode === "ec")
 		{
-			$numbits = (int)CLI::GetUserInputWithArgs($args, "bits", "Number of bits", $data["last_csr_answers"]["numbits"], "The more bits in a generated SSL certificate, the more secure the connection.  However, the more bits there are, the longer it takes to connect to a server.  Must be at least 1024 bits but the default of 4096 is reasonably strong.", $suppressoutput);
-			if ($numbits < 1024)  CLI::DisplayError("Invalid number of bits specified.  Must be at least 1024.", false, false);
-		} while ($numbits < 1024);
+			// Elliptic Curve.
+			do
+			{
+				$algorithm = CLI::GetUserInputWithArgs($args, "algorithm", "Elliptic Curve name/algorithm", $data["last_csr_answers"]["algorithm"], "A named curve.  Popular names are:  secp256r1, Curve448, Curve25519, Ed448, Ed25519", $suppressoutput);
+				if (!class_exists("\\phpseclib3\\Crypt\\EC\\Curves\\" . $algorithm, false))  CLI::DisplayError("Class not found.  Unknown named curve.", false, false);
+				else  break;
+			} while (true);
+
+			$numbits = $data["last_csr_answers"]["numbits"];
+		}
+		else if ($pkimode === "rsa")
+		{
+			// RSA.
+			$algorithm = "rsa";
+
+			// Number of bits.
+			do
+			{
+				$numbits = (int)CLI::GetUserInputWithArgs($args, "bits", "Number of bits", $data["last_csr_answers"]["numbits"], "The more bits in a generated certificate, the more secure the connection.  However, the more bits there are, the longer it takes to connect to a server.  Must be at least 1024 bits but the default of 4096 is reasonably strong.", $suppressoutput);
+				if ($numbits < 1024)  CLI::DisplayError("Invalid number of bits specified.  Must be at least 1024.", false, false);
+			} while ($numbits < 1024);
+		}
 
 		// Digest algorithm.
 		$digest = CLI::GetLimitedUserInputWithArgs($args, "digest", "Digest algorithm", $data["last_csr_answers"]["digest"], "Available digests (hash algorithms):", $digests, true, $suppressoutput);
@@ -383,7 +422,9 @@
 		if ($email === "-")  $email = "";
 		if ($commonname === "-")  $commonname = "";
 
-		$data["last_csr_answers"] = array(
+		$data["last_csr_answers"] = InitLastCSRAnswers(array(
+			"pkimode" => $pkimode,
+			"algorithm" => $algorithm,
 			"numbits" => (string)$numbits,
 			"digest" => $digest,
 			"domains" => $domains,
@@ -395,26 +436,22 @@
 			"orgunit" => $orgunit,
 			"email" => $email,
 			"commonname" => $commonname
-		);
+		));
 
 		// Generate the CSR.
 		if (!$suppressoutput)  echo "\nGenerating CSR... (this can take a while!)\n";
 
-		$rsa = new Crypt_RSA();
-		$info = $rsa->createKey($numbits);
+		if ($pkimode === "ec")  $privatekey = \phpseclib3\Crypt\EC::createKey($algorithm)->withHash($digest);
+		else  $privatekey = \phpseclib3\Crypt\RSA::createKey($numbits)->withHash($digest);
+
+		$publickey = $privatekey->getPublicKey();
 
 		$data["csr"] = array(
-			"publickey" => $info["publickey"],
-			"privatekey" => $info["privatekey"],
+			"publickey" => (string)$publickey,
+			"privatekey" => (string)$privatekey,
 		);
 
-		$privatekey = new Crypt_RSA();
-		$privatekey->loadKey($info["privatekey"]);
-
-		$publickey = new Crypt_RSA();
-		$publickey->loadKey($info["publickey"]);
-
-		$csr = new File_X509();
+		$csr = new \phpseclib3\File\X509();
 		$csr->setPrivateKey($privatekey);
 		$csr->setPublicKey($publickey);
 
@@ -456,7 +493,7 @@
 		}
 
 		// Have to sign, save, and load the CSR to add extensions.
-		$csr->loadCSR($csr->saveCSR($csr->signCSR($digest . "WithRSAEncryption")));
+		$csr->loadCSR($csr->saveCSR($csr->signCSR()));
 
 		$keyusage2 = explode(",", $keyusage);
 		foreach ($keyusage2 as $num => $val)  $keyusage2[$num] = trim($val);
@@ -469,11 +506,12 @@
 			{
 				$domains2[] = array("dNSName" => $domain);
 			}
+
 			if (!$csr->setExtension("id-ce-subjectAltName", $domains2))  CLI::DisplayError("Unable to set extension subjectAltName in the CSR.");
 		}
 
 		// Sign and save the CSR.
-		$data["csr"]["csr"] = $csr->saveCSR($csr->signCSR($digest . "WithRSAEncryption"));
+		$data["csr"]["csr"] = $csr->saveCSR($csr->signCSR());
 		$data["csr"]["created"] = time();
 
 		// Extract information from the CSR.
@@ -507,7 +545,7 @@
 		$data = $result["data"];
 
 		// Ask if this is a CA.
-		$ca = CLI::GetYesNoUserInputWithArgs($args, "ca", "Certificate Authority (CA)", "N", "Declaring this self-signed certificate as a Certificate Authority implies it will be a root certificate that will be used to sign other certificates.  Preferably root CA certs are used to generate intermediate certificates which will be used to sign server and client certificates.", $suppressoutput);
+		$ca = CLI::GetYesNoUserInputWithArgs($args, "ca", "Certificate Authority (CA)", "N", "Declaring this self-signed certificate as a Certificate Authority implies it will be a root certificate that will be used to sign other certificates.  Preferably, root CA certs are stored in offline, air-gapped systems and used exclusively to generate intermediate CA certificates, which will then be used to sign server and client certificates.", $suppressoutput);
 
 		// Ask how long to allow the certificate to be valid for.
 		$days = (int)CLI::GetUserInputWithArgs($args, "days", "How many days to sign the certificate for", ($ca ? "3650" : "365"), "", $suppressoutput);
@@ -519,26 +557,25 @@
 		// Generate the certificate.
 		if (!$suppressoutput)  echo "\nSelf-signing CSR... (this can take a while!)\n";
 
-		$privatekey = new Crypt_RSA();
-		$privatekey->loadKey($data["csr"]["privatekey"]);
+		$privatekey = \phpseclib3\Crypt\PublicKeyLoader::loadPrivateKey($data["csr"]["privatekey"])->withHash($digest);
 
-		$issuer = new File_X509();
+		$issuer = new \phpseclib3\File\X509();
 		$issuer->loadCSR($data["csr"]["csr"]);
 		$issuer->setPrivateKey($privatekey);
 		if ($issuer->validateSignature() !== true)  CLI::DisplayError("Unable to validate the CSR's signature.");
 
-		$subject = new File_X509();
+		$subject = new \phpseclib3\File\X509();
 		$subject->loadCSR($data["csr"]["csr"]);
 		if ($subject->validateSignature() !== true)  CLI::DisplayError("Unable to validate the CSR's signature.");
 
-		$certsigner = new File_X509();
+		$certsigner = new \phpseclib3\File\X509();
 		if ($ca)  $certsigner->makeCA();
 		$certsigner->setStartDate("-1 day");
 		$certsigner->setEndDate("+" . $days . " day");
 		$data["last_serial"]++;
 		$certsigner->setSerialNumber($data["last_serial"], 10);
 
-		$signed = $certsigner->sign($issuer, $subject, $digest . "WithRSAEncryption");
+		$signed = $certsigner->sign($issuer, $subject);
 		if ($signed === false)  CLI::DisplayError("Unable to self-sign CSR.");
 		$cert = $certsigner->saveX509($signed);
 
@@ -588,12 +625,10 @@
 			$ca_data = $result["data"];
 
 			// Load the CA certificate.
-			$privatekey = new Crypt_RSA();
-			$privatekey->loadKey($ca_data["cert"]["privatekey"]);
+			$privatekey = \phpseclib3\Crypt\PublicKeyLoader::loadPrivateKey($ca_data["cert"]["privatekey"]);
 
-			$issuer = new File_X509();
+			$issuer = new \phpseclib3\File\X509();
 			$issuer->loadX509($ca_data["cert"]["cert"]);
-			$issuer->setPrivateKey($privatekey);
 
 			// Confirm that the CA is allowed to sign certificates (keyCertSign).
 			$keyusages = $issuer->getExtension("id-ce-keyUsage");
@@ -627,21 +662,27 @@
 		// Digest algorithm.
 		$digest = CLI::GetLimitedUserInputWithArgs($args, "digest", "Digest algorithm", "sha256", "Available digests (hash algorithms):", $digests, true, $suppressoutput);
 
+		$privatekey = $privatekey->withHash($digest);
+		$issuer->setPrivateKey($privatekey);
+
 		// Load the CSR.
-		$subject = new File_X509();
+		$subject = new \phpseclib3\File\X509();
 		$subject->loadCSR($csr_data["csr"]["csr"]);
 		if ($subject->validateSignature() !== true)  CLI::DisplayError("Unable to validate the CSR's signature.");
 
 		$publickey = $subject->getPublicKey();
 
-		// Ask for the minimum number of bits for the public key required before signing.
-		do
+		// Ask for the minimum number of bits required for RSA public keys before signing.
+		if ($publickey instanceof \phpseclib\Crypt\RSA)
 		{
-			$numbits = (int)CLI::GetUserInputWithArgs($args, "bits", "Minimum number of bits required", "4096", "The next question allows a minimum number of bits to be enforced for the CSR public key prior to signing it.", $suppressoutput);
-			if ($numbits < 1024)  CLI::DisplayError("Invalid number of bits specified.  Must be at least 1024.", false, false);
-		} while ($numbits < 1024);
+			do
+			{
+				$numbits = (int)CLI::GetUserInputWithArgs($args, "bits", "Minimum number of bits required", "4096", "The next question allows a minimum number of bits to be enforced for the CSR RSA public key prior to signing it.", $suppressoutput);
+				if ($numbits < 1024)  CLI::DisplayError("Invalid number of bits specified.  Must be at least 1024.", false, false);
+			} while ($numbits < 1024);
 
-		if ($numbits > $publickey->getSize())  CLI::DisplayError("Invalid number of bits for the CSR public key.  Expected at least " . $numbits . " bits.  CSR public key is only " . $publickey->getSize() . " bits.");
+			if ($numbits > $publickey->getSize())  CLI::DisplayError("Invalid number of bits for the CSR RSA public key.  Expected at least " . $numbits . " bits.  CSR RSA public key is only " . $publickey->getSize() . " bits.");
+		}
 
 		$redo = CLI::GetYesNoUserInputWithArgs($args, "redo", "Re-enter CSR information (domains, key usage, common name, etc)", "Y", "CSR information:\n\n" . json_encode($csr_data["csrinfo"], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES), $suppressoutput);
 
@@ -656,16 +697,16 @@
 			}
 			$subject->removeDNProp("id-emailAddress");
 
-			$attributes = $subject->getAttributes();
-			foreach ($attributes as $attribute)
-			{
-				$subject->removeAttribute($attribute);
-			}
-
 			$extensions = $subject->getExtensions();
 			foreach ($extensions as $extension)
 			{
 				$subject->removeExtension($extension);
+			}
+
+			$attributes = $subject->getAttributes();
+			foreach ($attributes as $attribute)
+			{
+				$subject->removeAttribute($attribute);
 			}
 
 			// Get the domains.
@@ -745,14 +786,14 @@
 		// Generate the certificate.
 		if (!$suppressoutput)  echo "\nSigning CSR... (this can take a while!)\n";
 
-		$certsigner = new File_X509();
+		$certsigner = new \phpseclib3\File\X509();
 		if ($ca)  $certsigner->makeCA();
 		$certsigner->setStartDate("-1 day");
 		$certsigner->setEndDate("+" . $days . " day");
 		$ca_data["last_serial"]++;
 		$certsigner->setSerialNumber($ca_data["last_serial"], 10);
 
-		$signed = $certsigner->sign($issuer, $subject, $digest . "WithRSAEncryption");
+		$signed = $certsigner->sign($issuer, $subject);
 		if ($signed === false)  CLI::DisplayError("Unable to sign CSR.");
 		$cert = $certsigner->saveX509($signed);
 
@@ -774,6 +815,9 @@
 
 		file_put_contents($csr_filename, json_encode($csr_data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
 		chmod($csr_filename, 0600);
+
+		file_put_contents($ca_filename, json_encode($ca_data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+		chmod($ca_filename, 0600);
 
 		if (!$suppressoutput)  echo "\nSigned Certificate:\n\n" . $csr_data["cert"]["cert"] . "\n\n";
 
@@ -797,7 +841,7 @@
 		$result = GetSSLObject();
 
 		if (isset($result["data"]["csr"]))  $result["data"]["csr"] = $result["data"]["csr"]["csr"];
-		if (isset($result["data"]["cert"])) $result["data"]["cert"] = $result["data"]["cert"]["cert"];
+		if (isset($result["data"]["cert"]))  $result["data"]["cert"] = $result["data"]["cert"]["cert"];
 
 		$result = array(
 			"sucess" => true,
@@ -866,12 +910,12 @@
 
 			$currcert = $data["cert"]["cert"];
 
-			$cert = new File_X509();
+			$cert = new \phpseclib3\File\X509();
 			if (!$cert->loadX509($currcert))  CLI::DisplayError("Unable to load the certificate in '" . $currid . "'.");
 
 			if ($lastid !== "")
 			{
-				$cert = new File_X509();
+				$cert = new \phpseclib3\File\X509();
 				if (!$cert->loadCA($currcert))  CLI::DisplayError("Unable to load the certificate in '" . $currid . "' as a CA.");
 				if (!$cert->loadX509($lastcert))  CLI::DisplayError("Unable to load the certificate in '" . $lastid . "'.");
 				if ($cert->validateSignature() !== true)  CLI::DisplayError("Unable to validate the signature of the certificate in '" . $lastid . "' using the certificate in '" . $currid . "'.  The certificate chain is invalid.");
@@ -888,12 +932,12 @@
 		// Test the root certificate.
 		if ($lastid !== "")
 		{
-			$cert = new File_X509();
+			$cert = new \phpseclib3\File\X509();
 			if (!$cert->loadX509($lastcert))  CLI::DisplayError("Unable to load the certificate in '" . $lastid . "'.");
 			if ($cert->validateSignature() !== false || $cert->validateSignature(false) !== true)  CLI::DisplayError("Unable to validate the signature of the certificate in '" . $lastid . "' as a root/self-signed certificate.");
 		}
 
-		if (!$suppressoutput)  echo "\nThe entire SSL certificate chain is valid.\n";
+		if (!$suppressoutput)  echo "\nThe entire certificate chain is valid.\n";
 
 		$result = array(
 			"success" => true,
@@ -918,18 +962,17 @@
 
 		if (isset($data["csr"]))
 		{
-			$csr = new File_X509();
+			$csr = new \phpseclib3\File\X509();
 			if (!$csr->loadCSR($data["csr"]["csr"]))  CLI::DisplayError("Unable to load the CSR.");
 			if ($csr->validateSignature() !== true)  CLI::DisplayError("Unable to validate the CSR's signature.");
 
 			// Write the private key to disk in PKCS#8 format if it is defined.
 			if ($data["csr"]["privatekey"] !== "")
 			{
-				$rsa = new Crypt_RSA();
-				if (!$rsa->loadKey($data["csr"]["privatekey"]))  CLI::DisplayError("The CSR contains an invalid private key.");
+				$privatekey = \phpseclib3\Crypt\PublicKeyLoader::loadPrivateKey($data["csr"]["privatekey"]);
 
 				$paths["csr_key"] = $rootpath . "/cache/" . $baseid . "/" . $baseid . "_private_key.pem";
-				$datamap["csr_key"] = $rsa->getPrivateKey(CRYPT_RSA_PRIVATE_FORMAT_PKCS8);
+				$datamap["csr_key"] = (string)$privatekey;
 			}
 
 			// Write the CSR to disk in multiple formats.
@@ -937,23 +980,22 @@
 			$datamap["csr_pem"] = $data["csr"]["csr"];
 
 			$paths["csr_der"] = $rootpath . "/cache/" . $baseid . "/" . $baseid . "_csr.der";
-			$datamap["csr_der"] = $csr->_extractBER($data["csr"]["csr"]);
+			$datamap["csr_der"] = $csr->saveCSR($csr->getCurrentCert(), \phpseclib3\File\X509::FORMAT_DER);
 		}
 
 		if (isset($data["cert"]))
 		{
-			$cert = new File_X509();
+			$cert = new \phpseclib3\File\X509();
 			if (!$cert->loadX509($data["cert"]["cert"]))  CLI::DisplayError("Unable to load the certificate.");
 
 			// Write the private key to disk in PKCS#8 format if it is defined.
 			if ($data["cert"]["privatekey"] !== "")
 			{
-				$rsa = new Crypt_RSA();
-				if (!$rsa->loadKey($data["cert"]["privatekey"]))  CLI::DisplayError("The certificate contains an invalid private key.");
+				$privatekey = \phpseclib3\Crypt\PublicKeyLoader::loadPrivateKey($data["cert"]["privatekey"]);
 
 				// The path here is intentionally identical to the CSR path.  This key will overwrite the CSR key.
 				$paths["cert_key"] = $rootpath . "/cache/" . $baseid . "/" . $baseid . "_private_key.pem";
-				$datamap["cert_key"] = $rsa->getPrivateKey(CRYPT_RSA_PRIVATE_FORMAT_PKCS8);
+				$datamap["cert_key"] = (string)$privatekey;
 			}
 
 			// Write the base certificate to disk in multiple formats.
@@ -961,7 +1003,7 @@
 			$datamap["cert_pem"] = $data["cert"]["cert"];
 
 			$paths["cert_der"] = $rootpath . "/cache/" . $baseid . "/" . $baseid . "_cert.der";
-			$datamap["cert_der"] = $cert->_extractBER($data["cert"]["cert"]);
+			$datamap["cert_der"] = $cert->saveX509($cert->getCurrentCert(), \phpseclib3\File\X509::FORMAT_DER);
 
 			// Now read the remaining certificates in the chain in leaf to root order.
 			$currid = $baseid;
@@ -1037,31 +1079,21 @@
 			if (!$valid)  CLI::DisplayError("File '" . $privatekeyfile . "' does not exist.", false, false);
 		} while (!$valid);
 
-		$csr = new File_X509();
-		$csrdata = $csr->_extractBER(file_get_contents($csrfile));
-		$csrdata = "-----BEGIN CERTIFICATE REQUEST-----\r\n" . chunk_split(base64_encode($csrdata), 64) . "-----END CERTIFICATE REQUEST-----";
-		if (!$csr->loadCSR($csrdata))  CLI::DisplayError("Unable to load the CSR.");
+		$csr = new \phpseclib3\File\X509();
+		if (!$csr->loadCSR(file_get_contents($csrfile)))  CLI::DisplayError("Unable to load the CSR.");
 		if ($csr->validateSignature() !== true)  CLI::DisplayError("Unable to validate the CSR's signature.");
 
 		// Extract the public key from the CSR.
 		$publickey = $csr->getPublicKey();
-		$publickey = $publickey->getPublicKey(CRYPT_RSA_PUBLIC_FORMAT_PKCS8);
 
 		// Load the private key file.
-		if ($privatekeyfile === "")  $privatekey = "";
-		else
-		{
-			$privatekey = file_get_contents($privatekeyfile);
-
-			$rsa = new Crypt_RSA();
-			if (!$rsa->loadKey($privatekey))  CLI::DisplayError("File '" . $privatekeyfile . "' is not a valid private key.");
-		}
+		$privatekey = ($privatekeyfile !== "" ? \phpseclib3\Crypt\PublicKeyLoader::loadPrivateKey(file_get_contents($privatekeyfile)) : "");
 
 		// Save CSR.
 		$data["csr"] = array(
-			"publickey" => $publickey,
-			"privatekey" => $privatekey,
-			"csr" => $csrdata,
+			"publickey" => (string)$publickey,
+			"privatekey" => (string)$privatekey,
+			"csr" => $csr->saveCSR($csr->getCurrentCert()),
 			"created" => time()
 		);
 
@@ -1103,10 +1135,8 @@
 			else
 			{
 				// Load the certificate.
-				$cert = new File_X509();
-				$certdata = $cert->_extractBER(file_get_contents($certfile));
-				$certdata = "-----BEGIN CERTIFICATE-----\r\n" . chunk_split(base64_encode($certdata), 64) . "-----END CERTIFICATE-----";
-				$valid = $cert->loadX509($certdata);
+				$cert = new \phpseclib3\File\X509();
+				$valid = $cert->loadX509(file_get_contents($certfile));
 				if (!$valid)  CLI::DisplayError("File '" . $certfile . "' is not a valid certificate.  Unable to load the certificate.", false, false);
 			}
 		} while (!$valid);
@@ -1130,20 +1160,13 @@
 				if (!$valid)  CLI::DisplayError("File '" . $privatekeyfile . "' does not exist.", false, false);
 				else
 				{
-					$privatekey = file_get_contents($privatekeyfile);
-
-					$rsa = new Crypt_RSA();
-					$valid = $rsa->loadKey($privatekey);
-					if (!$valid)  CLI::DisplayError("File '" . $privatekeyfile . "' is not a valid private key.", false, false);
+					$privatekey = \phpseclib3\Crypt\PublicKeyLoader::loadPrivateKey(file_get_contents($privatekeyfile));
 				}
 			} while (!$valid);
 		}
 		else if ($privatekeysrc === "csr")
 		{
-			$privatekey = $data["csr"]["privatekey"];
-
-			$rsa = new Crypt_RSA();
-			if (!$rsa->loadKey($privatekey))  CLI::DisplayError("The CSR does not contain a valid private key.");
+			$privatekey = \phpseclib3\Crypt\PublicKeyLoader::loadPrivateKey($data["csr"]["privatekey"]);
 
 			// Remove the CSR since it is no longer needed.
 			unset($data["csr"]);
@@ -1155,12 +1178,11 @@
 
 		// Extract the public key from the certificate.
 		$publickey = $cert->getPublicKey();
-		$publickey = $publickey->getPublicKey(CRYPT_RSA_PUBLIC_FORMAT_PKCS8);
 
 		$data["cert"] = array(
-			"privatekey" => $privatekey,
-			"publickey" => $publickey,
-			"cert" => $certdata,
+			"privatekey" => (string)$privatekey,
+			"publickey" => (string)$publickey,
+			"cert" => $cert->saveX509($cert->getCurrentCert()),
 			"created" => time(),
 			"ca" => $ca,
 			"signer" => ""
